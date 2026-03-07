@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  /* Questrade Grey palette */
+  --color-qt-white: #FFFFFF;
+  --color-qt-bg-2: #F8F8FA;
+  --color-qt-bg-3: #F2F2F8;
+  --color-qt-border: #CED6E2;
+  --color-qt-gray-dark: #78899F;
+  --color-qt-secondary: #5E6D83;
+  --color-qt-primary: #262D33;
+
+  /* Questrade Green palette */
+  --color-qt-green: #389B3C;
+  --color-qt-green-dark: #227C20;
+  --color-qt-green-light: #ADDEAF;
+  --color-qt-green-bg: #E8F5E9;
+
+  /* Questrade Red palette */
+  --color-qt-red: #D33E54;
+  --color-qt-red-bg: #FDEAED;
+
+  /* Questrade Blue palette */
+  --color-qt-blue: #1A73E8;
+
+  /* Typography */
+  --font-display: 'Roboto Slab', serif;
+  --font-body: 'Open Sans', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-qt-primary);
+  background: var(--color-qt-white);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
