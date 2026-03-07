@@ -8,7 +8,7 @@ interface TooltipProps {
 
 export default function Tooltip({ content, children }: TooltipProps) {
   const [open, setOpen] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   function show() {
     clearTimeout(timeoutRef.current);

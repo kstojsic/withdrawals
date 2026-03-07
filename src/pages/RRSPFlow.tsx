@@ -6,7 +6,6 @@ import Tooltip from '../components/Tooltip';
 import AccountDropdown from '../components/AccountDropdown';
 import BalanceCard from '../components/BalanceCard';
 import CurrencySelector from '../components/CurrencySelector';
-import InputField from '../components/InputField';
 import CurrencyInput from '../components/CurrencyInput';
 import MethodSelector from '../components/MethodSelector';
 import BankSelector from '../components/BankSelector';
@@ -52,7 +51,6 @@ export default function RRSPFlow() {
   });
   const [signed, setSigned] = useState(false);
   const [hbpEligible, setHbpEligible] = useState<boolean | null>(null);
-  const [hbpAnswers, setHbpAnswers] = useState<Record<string, unknown>>({});
   const [llpEligible, setLlpEligible] = useState(false);
   const [llpData, setLlpData] = useState<Record<string, unknown>>({});
   const [ovpFormMailed, setOvpFormMailed] = useState(false);
@@ -347,7 +345,6 @@ export default function RRSPFlow() {
               <section>
                 <HBPEligibility
                   onEligibilityChange={setHbpEligible}
-                  onAnswersChange={setHbpAnswers as (a: Record<string, unknown>) => void}
                 />
               </section>
             </WizardSection>

@@ -414,12 +414,12 @@ export default function FHSAFlow() {
               Review & confirm
             </h2>
 
-            {isQualifying && qualifyingData.street && (
+            {isQualifying && !!qualifyingData.street && (
               <div className="bg-white border border-qt-border rounded-lg divide-y divide-qt-border mb-6">
                 <SummaryRow label="Account holder" value="Anastasia Carmichael" />
                 <SummaryRow
                   label="Property address"
-                  value={`${qualifyingData.street}, ${qualifyingData.city}, ${qualifyingData.province} ${qualifyingData.postalCode}`}
+                  value={`${String(qualifyingData.street)}, ${String(qualifyingData.city)}, ${String(qualifyingData.province)} ${String(qualifyingData.postalCode)}`}
                 />
               </div>
             )}

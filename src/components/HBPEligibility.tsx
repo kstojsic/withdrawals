@@ -50,7 +50,7 @@ const initialState: HBPState = {
 
 interface HBPEligibilityProps {
   onEligibilityChange: (eligible: boolean | null) => void;
-  onAnswersChange: (answers: HBPState) => void;
+  onAnswersChange?: (answers: HBPState) => void;
 }
 
 export default function HBPEligibility({ onEligibilityChange, onAnswersChange }: HBPEligibilityProps) {
@@ -88,7 +88,7 @@ export default function HBPEligibility({ onEligibilityChange, onAnswersChange }:
 
   useEffect(() => {
     onEligibilityChange(eligibility);
-    onAnswersChange(s);
+    onAnswersChange?.(s);
   }, [s]);
 
   return (

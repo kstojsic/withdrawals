@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Plus, Building2, Check } from 'lucide-react';
 import type { LinkedBank } from '../types';
-import { linkedBanks } from '../data/accounts';
 import LinkBankModal from './LinkBankModal';
 
 interface BankSelectorProps {
