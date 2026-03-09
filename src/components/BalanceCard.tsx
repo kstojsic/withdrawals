@@ -8,7 +8,7 @@ interface BalanceCardProps {
 }
 
 export default function BalanceCard({ account }: BalanceCardProps) {
-  const [combined, setCombined] = useState(false);
+  const [combined, setCombined] = useState(true);
   const isMargin = account.type === 'MARGIN' && account.marginBreakdown;
 
   const cadBalance = account.balance.cad;
@@ -24,9 +24,10 @@ export default function BalanceCard({ account }: BalanceCardProps) {
   const usdLabel = combined ? 'Combined USD' : 'USD';
 
   return (
+    <div>
     <div className="border border-qt-border rounded-lg overflow-hidden shadow-sm">
       <div className="flex items-center justify-between px-5 py-3 bg-qt-bg-3 border-b border-qt-border">
-        <p className="font-semibold text-sm text-qt-primary">Account Balance</p>
+        <p className="font-semibold text-sm text-qt-primary">Available to Withdraw</p>
         <button
           onClick={() => setCombined((c) => !c)}
           className="flex items-center gap-2 text-xs font-semibold text-qt-green-dark hover:underline cursor-pointer"
@@ -86,6 +87,10 @@ export default function BalanceCard({ account }: BalanceCardProps) {
           </div>
         </div>
       )}
+    </div>
+    <p className="text-xs text-qt-secondary mt-2 leading-relaxed">
+      You can only withdraw fully settled funds. Any funds from recent trades will be available for withdrawal upon settlement (typically 1 business day).
+    </p>
     </div>
   );
 }

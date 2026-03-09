@@ -55,11 +55,11 @@ function CurrencyBox({
           : 'border-qt-border hover:border-qt-gray-dark bg-white'
         }`}
     >
-      <p className={`text-xs font-bold tracking-wider uppercase mb-1 ${selected ? 'text-qt-green-dark' : 'text-qt-secondary'}`}>
+      <p className={`text-sm font-bold tracking-wider uppercase mb-1.5 ${selected ? 'text-qt-green-dark' : 'text-qt-secondary'}`}>
         {label}
       </p>
-      <p className="text-lg font-semibold text-qt-primary">
-        {formatCurrency(amount, currency)}
+      <p className="text-xs text-qt-secondary">
+        Available up to <span className="font-semibold text-qt-primary">{formatCurrency(amount, currency)}</span>
       </p>
     </button>
   );
