@@ -377,7 +377,7 @@ export default function FHSAFlow() {
                 {/* Q1: Excess amount */}
                 <div className="flex flex-col gap-2">
                   <label className="font-semibold text-sm text-qt-primary">
-                    1. How much is your excess FHSA amount (the amount you overcontributed)?
+                    How much is your excess FHSA amount (the amount you overcontributed)?
                   </label>
                   <div className="max-w-xs">
                     <input
@@ -397,42 +397,50 @@ export default function FHSAFlow() {
                   </div>
                 </div>
 
-                {/* Q2: Source of excess */}
+                {/* Source of excess */}
                 <WizardSection visible={!!ovpExcessAmount && parseFloat(stripFormatting(ovpExcessAmount)) > 0}>
                   <div className="flex flex-col gap-3">
                     <p className="font-semibold text-sm text-qt-primary">
-                      2. How did the excess money originally get into your FHSA?
+                      How did the excess money originally get into your FHSA?
                     </p>
                     <RadioButton
+                      name="ovpSource"
+                      value="cash"
                       label="I deposited cash directly from my bank account"
-                      selected={ovpSource === 'cash'}
-                      onClick={() => { setOvpSource('cash'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
+                      checked={ovpSource === 'cash'}
+                      onChange={() => { setOvpSource('cash'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
                     />
                     <RadioButton
+                      name="ovpSource"
+                      value="rrsp"
                       label="I transferred the money in from my RRSP"
-                      selected={ovpSource === 'rrsp'}
-                      onClick={() => { setOvpSource('rrsp'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
+                      checked={ovpSource === 'rrsp'}
+                      onChange={() => { setOvpSource('rrsp'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
                     />
                     <RadioButton
+                      name="ovpSource"
+                      value="both"
                       label="A mix of both cash deposits and RRSP transfers"
-                      selected={ovpSource === 'both'}
-                      onClick={() => { setOvpSource('both'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
+                      checked={ovpSource === 'both'}
+                      onChange={() => { setOvpSource('both'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
                     />
                   </div>
                 </WizardSection>
 
-                {/* Q3: Removal method */}
+                {/* Removal method */}
                 <WizardSection visible={!!ovpSource}>
                   <div className="flex flex-col gap-3">
                     <p className="font-semibold text-sm text-qt-primary">
-                      3. How would you like to remove these excess funds today?
+                      How would you like to remove these excess funds today?
                     </p>
                     {ovpRemovalOptions.map((opt) => (
                       <RadioButton
                         key={opt.value}
+                        name="ovpRemoval"
+                        value={opt.value}
                         label={opt.label}
-                        selected={ovpRemovalMethod === opt.value}
-                        onClick={() => { setOvpRemovalMethod(opt.value); setOvpTransferAccount(null); }}
+                        checked={ovpRemovalMethod === opt.value}
+                        onChange={() => { setOvpRemovalMethod(opt.value); setOvpTransferAccount(null); }}
                       />
                     ))}
                   </div>
@@ -442,7 +450,7 @@ export default function FHSAFlow() {
                 <WizardSection visible={ovpRemovalMethod === 'transfer'}>
                   <div className="flex flex-col gap-2">
                     <label className="font-semibold text-sm text-qt-primary">
-                      4. Which retirement account would you like to transfer the funds into?
+                      Which retirement account would you like to transfer the funds into?
                     </label>
                     <select
                       value={ovpTransferAccount || ''}
