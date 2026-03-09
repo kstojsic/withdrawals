@@ -55,7 +55,7 @@ function CurrencyBox({
           : 'border-qt-border hover:border-qt-gray-dark bg-white'
         }`}
     >
-      <p className={`text-sm font-bold tracking-wider uppercase mb-1.5 ${selected ? 'text-qt-green-dark' : 'text-qt-secondary'}`}>
+      <p className="text-sm font-bold tracking-wider uppercase mb-1.5 text-qt-primary">
         {label}
       </p>
       <p className="text-xs text-qt-secondary">
