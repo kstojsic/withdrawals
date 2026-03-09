@@ -22,7 +22,7 @@ import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE } from '
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, RRSPWithdrawalType } from '../types';
 
 const rrspOptions: { value: RRSPWithdrawalType; label: string; badge?: string }[] = [
-  { value: 'deregistration', label: 'Retirement or Personal Cash', badge: 'Taxable' },
+  { value: 'deregistration', label: 'Deregistration (Retirement or Another Reason)', badge: 'Taxable' },
   { value: 'hbp', label: "Home Buyer's Plan" },
   { value: 'llp', label: 'Lifelong Learning Plan' },
   { value: 'overcontribution', label: 'Overcontribution' },
@@ -137,7 +137,7 @@ export default function RRSPFlow() {
               Withdrawal submitted
             </h2>
             <p className="text-base text-qt-secondary leading-6 mb-2">
-              Your {isHBP ? "Home Buyer's Plan" : isLLP ? 'Lifelong Learning Plan' : isOvercontribution ? 'overcontribution' : 'Retirement or Personal Cash'} withdrawal request has been submitted.
+              Your {isHBP ? "Home Buyer's Plan" : isLLP ? 'Lifelong Learning Plan' : isOvercontribution ? 'overcontribution' : 'deregistration'} withdrawal request has been submitted.
             </p>
             <p className="text-sm text-qt-secondary leading-[22px] mb-8">
               Processing typically takes 1-3 business days. You'll receive a confirmation email shortly.
@@ -551,7 +551,7 @@ export default function RRSPFlow() {
         ? 'Lifelong Learning Plan'
         : isOvercontribution
           ? 'Overcontribution'
-          : 'Retirement or Personal Cash';
+          : 'Deregistration (Retirement or Another Reason)';
 
     const llpStudent = llpData.student === 'spouse'
       ? `${llpData.spouseFirstName || ''} ${llpData.spouseLastName || ''}`.trim()
