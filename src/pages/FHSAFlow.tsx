@@ -48,6 +48,8 @@ export default function FHSAFlow() {
     otherBrokerageAccount: '',
   });
   const [signed, setSigned] = useState(false);
+  const [qualifyingFormChoice, setQualifyingFormChoice] = useState<'upload' | 'fillhere' | null>(null);
+  const [qualifyingUploadedFile, setQualifyingUploadedFile] = useState<File | null>(null);
   const [qualifyingEligible, setQualifyingEligible] = useState(false);
   const [qualifyingData, setQualifyingData] = useState<Record<string, unknown>>({});
   const [confirmChecked, setConfirmChecked] = useState(false);
@@ -82,6 +84,8 @@ export default function FHSAFlow() {
     setMethod(null);
     setSelectedBank(null);
     setSigned(false);
+    setQualifyingFormChoice(null);
+    setQualifyingUploadedFile(null);
     setQualifyingEligible(false);
     setQualifyingData({});
     setConfirmChecked(false);
@@ -112,8 +116,15 @@ export default function FHSAFlow() {
     ? intlWire.bankName && intlWire.swiftCode
     : selectedBank;
 
-  const canContinueQualifying =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && qualifyingEligible && confirmChecked;
+  const canContinueQualifyingUpload =
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady
+    && qualifyingFormChoice === 'upload' && qualifyingUploadedFile && confirmChecked;
+
+  const canContinueQualifyingFill =
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady
+    && qualifyingFormChoice === 'fillhere' && qualifyingEligible && confirmChecked;
+
+  const canContinueQualifying = canContinueQualifyingUpload || canContinueQualifyingFill;
 
   const canContinueNonQualifying =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
@@ -210,6 +221,8 @@ export default function FHSAFlow() {
                     setMethod(null);
                     setSelectedBank(null);
                     setSigned(false);
+                    setQualifyingFormChoice(null);
+                    setQualifyingUploadedFile(null);
                     setQualifyingEligible(false);
                     setQualifyingData({});
                     setConfirmChecked(false);
@@ -313,8 +326,104 @@ export default function FHSAFlow() {
               </section>
             </WizardSection>
 
-            {/* Qualifying Eligibility */}
+            {/* Qualifying: Form choice */}
             <WizardSection visible={isQualifying && !!bankReady}>
+              <section className="flex flex-col gap-4">
+                <div>
+                  <p className="font-semibold text-sm text-qt-primary mb-1">RC725 — Qualifying withdrawal form</p>
+                  <p className="text-sm text-qt-secondary leading-relaxed">
+                    To meet government requirements, we need a completed RC725 form to process your request. Tell us how you'd like to complete your withdrawal form.
+                  </p>
+                </div>
+
+                {/* Option 1: Upload */}
+                <button
+                  type="button"
+                  onClick={() => { setQualifyingFormChoice('upload'); setQualifyingEligible(false); setQualifyingData({}); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${
+                    qualifyingFormChoice === 'upload'
+                      ? 'border-qt-green bg-qt-green-bg/30'
+                      : 'border-qt-border hover:border-qt-gray-dark bg-white'
+                  }`}
+                >
+                  <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
+                  <p className="text-sm text-qt-secondary leading-relaxed">
+                    Download, sign, and upload your document manually.
+                  </p>
+                  <a
+                    href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/rc725.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2"
+                  >
+                    Download RC725 from Canada.ca &rarr;
+                  </a>
+                </button>
+
+                {/* Option 2: Fill here */}
+                <button
+                  type="button"
+                  onClick={() => { setQualifyingFormChoice('fillhere'); setQualifyingUploadedFile(null); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${
+                    qualifyingFormChoice === 'fillhere'
+                      ? 'border-qt-green bg-qt-green-bg/30'
+                      : 'border-qt-border hover:border-qt-gray-dark bg-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">
+                      Recommended
+                    </span>
+                  </div>
+                  <p className="text-sm text-qt-secondary leading-relaxed">
+                    Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.
+                  </p>
+                </button>
+              </section>
+            </WizardSection>
+
+            {/* Qualifying: Upload form */}
+            <WizardSection visible={isQualifying && qualifyingFormChoice === 'upload'}>
+              <section className="flex flex-col gap-4">
+                <p className="font-semibold text-sm text-qt-primary">Upload your completed RC725 form</p>
+                <div
+                  className="border-2 border-dashed border-qt-border rounded-lg p-8 text-center hover:border-qt-gray-dark transition-colors cursor-pointer"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.dataTransfer.files?.[0]) setQualifyingUploadedFile(e.dataTransfer.files[0]);
+                  }}
+                  onClick={() => document.getElementById('rc725-upload')?.click()}
+                >
+                  <input
+                    id="rc725-upload"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) setQualifyingUploadedFile(e.target.files[0]); }}
+                  />
+                  {qualifyingUploadedFile ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <CheckCircle2 size={24} className="text-qt-green" />
+                      <p className="text-sm font-semibold text-qt-primary">{qualifyingUploadedFile.name}</p>
+                      <p className="text-xs text-qt-secondary">Click or drag to replace</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Download size={24} className="text-qt-secondary rotate-180" />
+                      <p className="text-sm text-qt-primary">Drag & drop your file here, or <span className="font-semibold text-qt-green-dark">browse</span></p>
+                      <p className="text-xs text-qt-secondary">Accepted formats: PDF, JPG, PNG</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </WizardSection>
+
+            {/* Qualifying Eligibility (fill here option) */}
+            <WizardSection visible={isQualifying && qualifyingFormChoice === 'fillhere'}>
               <section>
                 <FHSAEligibility
                   onComplete={(elig, data) => { setQualifyingEligible(elig); setQualifyingData(data as unknown as Record<string, unknown>); }}
@@ -325,7 +434,7 @@ export default function FHSAFlow() {
             </WizardSection>
 
             {/* Qualifying confirmation checkbox */}
-            <WizardSection visible={isQualifying && qualifyingEligible}>
+            <WizardSection visible={isQualifying && (qualifyingEligible || (qualifyingFormChoice === 'upload' && !!qualifyingUploadedFile))}>
               <section>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -595,13 +704,22 @@ export default function FHSAFlow() {
               </div>
             </div>
 
-            {isQualifying && (
+            {isQualifying && qualifyingFormChoice === 'fillhere' && (
               <div className="mb-6">
                 <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
                   <Download size={16} />
                   Download pre-filled RC725 form
                 </button>
                 <p className="text-xs text-qt-secondary mt-2">A copy will also be emailed to you.</p>
+              </div>
+            )}
+
+            {isQualifying && qualifyingFormChoice === 'upload' && qualifyingUploadedFile && (
+              <div className="bg-qt-bg-3 border border-qt-border rounded-lg p-4 mb-6">
+                <p className="text-sm text-qt-primary">
+                  <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
+                  RC725 form uploaded: <span className="font-semibold">{qualifyingUploadedFile.name}</span>
+                </p>
               </div>
             )}
 
