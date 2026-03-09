@@ -270,7 +270,10 @@ export default function FHSAFlow() {
                 <CurrencyInput
                   label="Gross withdrawal amount"
                   value={amount}
-                  onChange={setAmount}
+                  onChange={(val) => {
+                    setAmount(val);
+                    if (isOvercontribution) setOvpExcessAmount(val);
+                  }}
                   error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
                 />
               </section>
@@ -374,25 +377,19 @@ export default function FHSAFlow() {
                   </div>
                 </div>
 
-                {/* Q1: Excess amount */}
+                {/* Excess amount — synced bidirectionally with gross withdrawal amount */}
                 <div className="flex flex-col gap-2">
                   <label className="font-semibold text-sm text-qt-primary">
                     How much is your excess FHSA amount (the amount you overcontributed)?
                   </label>
                   <div className="max-w-xs">
-                    <input
-                      type="text"
-                      inputMode="decimal"
+                    <CurrencyInput
+                      label=""
                       value={ovpExcessAmount}
-                      onFocus={() => setOvpExcessAmount(stripFormatting(ovpExcessAmount))}
-                      onBlur={() => {
-                        const n = parseFloat(stripFormatting(ovpExcessAmount));
-                        if (!isNaN(n) && n > 0) setOvpExcessAmount(formatAmountDisplay(n));
-                        else setOvpExcessAmount('');
+                      onChange={(val) => {
+                        setOvpExcessAmount(val);
+                        setAmount(val);
                       }}
-                      onChange={(e) => setOvpExcessAmount(e.target.value)}
-                      placeholder="$0.00"
-                      className="w-full h-12 rounded-md border border-qt-gray-dark px-4 text-sm text-qt-primary outline-none focus:border-qt-green"
                     />
                   </div>
                 </div>
