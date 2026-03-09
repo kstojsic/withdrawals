@@ -15,8 +15,9 @@ import FHSAEligibility from '../components/FHSAEligibility';
 import ESignature from '../components/ESignature';
 import Button from '../components/Button';
 import InfoBox from '../components/InfoBox';
+import RadioButton from '../components/RadioButton';
 import WizardSection from '../components/WizardSection';
-import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE } from '../data/accounts';
+import { accounts, linkedBanks as defaultBanks, formatCurrency, formatAmountDisplay, stripFormatting, FX_RATE } from '../data/accounts';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, FHSAWithdrawalType } from '../types';
 
 const fhsaOptions: { value: FHSAWithdrawalType; label: string; badge?: string }[] = [
@@ -49,10 +50,18 @@ export default function FHSAFlow() {
   const [signed, setSigned] = useState(false);
   const [qualifyingEligible, setQualifyingEligible] = useState(false);
   const [qualifyingData, setQualifyingData] = useState<Record<string, unknown>>({});
-  const [ovpFormMailed, setOvpFormMailed] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // Overcontribution (RC727) state
+  const [ovpExcessAmount, setOvpExcessAmount] = useState('');
+  const [ovpSource, setOvpSource] = useState<'cash' | 'rrsp' | 'both' | null>(null);
+  const [ovpRemovalMethod, setOvpRemovalMethod] = useState<'withdrawal' | 'transfer' | null>(null);
+  const [ovpTransferAccount, setOvpTransferAccount] = useState<string | null>(null);
+  const [ovpTaxUnderstood, setOvpTaxUnderstood] = useState(false);
+  const [ovpAgreed, setOvpAgreed] = useState(false);
+  const [ovpSigned, setOvpSigned] = useState(false);
 
   function handleAccountChange(acct: Account) {
     if (acct.type !== 'FHSA') {
@@ -75,9 +84,15 @@ export default function FHSAFlow() {
     setSigned(false);
     setQualifyingEligible(false);
     setQualifyingData({});
-    setOvpFormMailed(false);
     setConfirmChecked(false);
     setShowSummary(false);
+    setOvpExcessAmount('');
+    setOvpSource(null);
+    setOvpRemovalMethod(null);
+    setOvpTransferAccount(null);
+    setOvpTaxUnderstood(false);
+    setOvpAgreed(false);
+    setOvpSigned(false);
   }
 
   const cadAvailable = account ? account.balance.cad : 0;
@@ -103,8 +118,25 @@ export default function FHSAFlow() {
   const canContinueNonQualifying =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
 
+  const rrspAccounts = accounts.filter((a) => a.type === 'RRSP');
+
+  const ovpRemovalOptions = ovpSource === 'cash'
+    ? [{ value: 'withdrawal' as const, label: 'Withdraw the funds as cash (Designated Withdrawal)' }]
+    : ovpSource === 'rrsp'
+      ? [{ value: 'transfer' as const, label: 'Transfer the funds to my RRSP or PRPP (Designated Transfer)' }]
+      : ovpSource === 'both'
+        ? [
+            { value: 'withdrawal' as const, label: 'Withdraw the funds as cash (Designated Withdrawal)' },
+            { value: 'transfer' as const, label: 'Transfer the funds to my RRSP or PRPP (Designated Transfer)' },
+          ]
+        : [];
+
+  const ovpTransferReady = ovpRemovalMethod === 'transfer' ? !!ovpTransferAccount : true;
+
   const canContinueOvercontribution =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && ovpFormMailed && confirmChecked;
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady
+    && ovpExcessAmount && ovpSource && ovpRemovalMethod && ovpTransferReady
+    && ovpTaxUnderstood && ovpAgreed && ovpSigned;
 
   function handleSubmit() {
     setSubmitted(true);
@@ -180,8 +212,14 @@ export default function FHSAFlow() {
                     setSigned(false);
                     setQualifyingEligible(false);
                     setQualifyingData({});
-                    setOvpFormMailed(false);
                     setConfirmChecked(false);
+                    setOvpExcessAmount('');
+                    setOvpSource(null);
+                    setOvpRemovalMethod(null);
+                    setOvpTransferAccount(null);
+                    setOvpTaxUnderstood(false);
+                    setOvpAgreed(false);
+                    setOvpSigned(false);
                   }}
                 />
               </section>
@@ -320,55 +358,152 @@ export default function FHSAFlow() {
               </div>
             </WizardSection>
 
-            {/* Overcontribution: T1-OVP + checkboxes */}
+            {/* Overcontribution: RC727 Questionnaire */}
             <WizardSection visible={isOvercontribution && !!bankReady}>
               <section className="flex flex-col gap-6">
-                <InfoBox variant="warning">
-                  <div className="flex flex-col gap-2">
-                    <p className="font-semibold">T1-OVP form required</p>
-                    <p>
-                      To process an overcontribution withdrawal, you must complete the following steps:
-                    </p>
-                    <ol className="list-decimal ml-5 flex flex-col gap-1 text-sm">
-                      <li>Download and fill out the <strong>T1-OVP Individual Tax Return for RRSP, PRPP and SPP Excess Contributions</strong> form.</li>
-                      <li>Send the completed form to the <strong>CRA</strong> for their signature.</li>
-                      <li>Once you receive the CRA-signed form, sign it yourself.</li>
-                      <li>Mail the fully signed form to Questrade.</li>
-                    </ol>
-                    <a
-                      href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/t1-ovp.html"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-1"
-                    >
-                      Download T1-OVP form &rarr;
-                    </a>
+                <h3 className="font-semibold text-sm text-qt-primary">RC727 — Remove excess FHSA contributions</h3>
+
+                {/* Pre-filled profile info */}
+                <div className="bg-qt-bg-3 rounded-lg p-4 flex flex-col gap-2">
+                  <p className="text-xs text-qt-secondary uppercase font-bold tracking-wider mb-1">Taxpayer Information</p>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                    <div><span className="text-qt-secondary">Name:</span> <span className="font-semibold text-qt-primary">Anastasia Carmichael</span></div>
+                    <div><span className="text-qt-secondary">SIN:</span> <span className="font-semibold text-qt-primary">•••-•••-123</span></div>
+                    <div><span className="text-qt-secondary">Address:</span> <span className="font-semibold text-qt-primary">42 Queen St W, Toronto ON</span></div>
+                    <div><span className="text-qt-secondary">Phone:</span> <span className="font-semibold text-qt-primary">(416) 555-0199</span></div>
                   </div>
-                </InfoBox>
+                </div>
 
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ovpFormMailed}
-                    onChange={(e) => setOvpFormMailed(e.target.checked)}
-                    className="mt-1 size-4 accent-qt-green cursor-pointer"
-                  />
-                  <span className="text-sm text-qt-primary leading-[22px]">
-                    I have mailed the signed T1-OVP form and it is on the way to Questrade
-                  </span>
-                </label>
+                {/* Q1: Excess amount */}
+                <div className="flex flex-col gap-2">
+                  <label className="font-semibold text-sm text-qt-primary">
+                    1. How much is your excess FHSA amount (the amount you overcontributed)?
+                  </label>
+                  <div className="max-w-xs">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={ovpExcessAmount}
+                      onFocus={() => setOvpExcessAmount(stripFormatting(ovpExcessAmount))}
+                      onBlur={() => {
+                        const n = parseFloat(stripFormatting(ovpExcessAmount));
+                        if (!isNaN(n) && n > 0) setOvpExcessAmount(formatAmountDisplay(n));
+                        else setOvpExcessAmount('');
+                      }}
+                      onChange={(e) => setOvpExcessAmount(e.target.value)}
+                      placeholder="$0.00"
+                      className="w-full h-12 rounded-md border border-qt-gray-dark px-4 text-sm text-qt-primary outline-none focus:border-qt-green"
+                    />
+                  </div>
+                </div>
 
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={confirmChecked}
-                    onChange={(e) => setConfirmChecked(e.target.checked)}
-                    className="mt-1 size-4 accent-qt-green cursor-pointer"
-                  />
-                  <span className="text-sm text-qt-primary leading-[22px]">
-                    I confirm that the information I've provided is true and accurate
-                  </span>
-                </label>
+                {/* Q2: Source of excess */}
+                <WizardSection visible={!!ovpExcessAmount && parseFloat(stripFormatting(ovpExcessAmount)) > 0}>
+                  <div className="flex flex-col gap-3">
+                    <p className="font-semibold text-sm text-qt-primary">
+                      2. How did the excess money originally get into your FHSA?
+                    </p>
+                    <RadioButton
+                      label="I deposited cash directly from my bank account"
+                      selected={ovpSource === 'cash'}
+                      onClick={() => { setOvpSource('cash'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
+                    />
+                    <RadioButton
+                      label="I transferred the money in from my RRSP"
+                      selected={ovpSource === 'rrsp'}
+                      onClick={() => { setOvpSource('rrsp'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
+                    />
+                    <RadioButton
+                      label="A mix of both cash deposits and RRSP transfers"
+                      selected={ovpSource === 'both'}
+                      onClick={() => { setOvpSource('both'); setOvpRemovalMethod(null); setOvpTransferAccount(null); }}
+                    />
+                  </div>
+                </WizardSection>
+
+                {/* Q3: Removal method */}
+                <WizardSection visible={!!ovpSource}>
+                  <div className="flex flex-col gap-3">
+                    <p className="font-semibold text-sm text-qt-primary">
+                      3. How would you like to remove these excess funds today?
+                    </p>
+                    {ovpRemovalOptions.map((opt) => (
+                      <RadioButton
+                        key={opt.value}
+                        label={opt.label}
+                        selected={ovpRemovalMethod === opt.value}
+                        onClick={() => { setOvpRemovalMethod(opt.value); setOvpTransferAccount(null); }}
+                      />
+                    ))}
+                  </div>
+                </WizardSection>
+
+                {/* Q4: RRSP account (if transfer) */}
+                <WizardSection visible={ovpRemovalMethod === 'transfer'}>
+                  <div className="flex flex-col gap-2">
+                    <label className="font-semibold text-sm text-qt-primary">
+                      4. Which retirement account would you like to transfer the funds into?
+                    </label>
+                    <select
+                      value={ovpTransferAccount || ''}
+                      onChange={(e) => setOvpTransferAccount(e.target.value || null)}
+                      className="w-full h-12 rounded-md border border-qt-gray-dark bg-white px-4 text-sm text-qt-primary outline-none focus:border-qt-green cursor-pointer"
+                    >
+                      <option value="">Select an account</option>
+                      {rrspAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>{a.label} - {a.accountNumber}</option>
+                      ))}
+                    </select>
+                  </div>
+                </WizardSection>
+
+                {/* Tax reminder */}
+                <WizardSection visible={!!ovpRemovalMethod && ovpTransferReady}>
+                  <div className="flex flex-col gap-4">
+                    <InfoBox variant="warning">
+                      <div className="flex flex-col gap-1">
+                        <p className="font-semibold">Important Tax Reminder</p>
+                        <p className="text-sm">
+                          Removing the excess funds stops the ongoing 1% monthly penalty, but you are still required to file <strong>Form RC728</strong> to pay the penalty for the months the excess funds sat in your account.
+                        </p>
+                      </div>
+                    </InfoBox>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ovpTaxUnderstood}
+                        onChange={(e) => setOvpTaxUnderstood(e.target.checked)}
+                        className="mt-1 size-4 accent-qt-green cursor-pointer"
+                      />
+                      <span className="text-sm text-qt-primary leading-[22px]">I understand</span>
+                    </label>
+                  </div>
+                </WizardSection>
+
+                {/* E-Signature */}
+                <WizardSection visible={ovpTaxUnderstood}>
+                  <div className="flex flex-col gap-4">
+                    <ESignature onSign={() => setOvpSigned(true)} signed={ovpSigned} />
+                  </div>
+                </WizardSection>
+
+                {/* Final declaration */}
+                <WizardSection visible={ovpSigned}>
+                  <div className="border border-qt-border rounded-lg p-5 bg-qt-bg-3">
+                    <p className="text-sm text-qt-primary leading-[22px] mb-4">
+                      I certify that the information provided is correct and I authorize this designation to remove my excess FHSA amount.
+                    </p>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ovpAgreed}
+                        onChange={(e) => setOvpAgreed(e.target.checked)}
+                        className="mt-1 size-4 accent-qt-green cursor-pointer"
+                      />
+                      <span className="text-sm font-semibold text-qt-primary">I agree</span>
+                    </label>
+                  </div>
+                </WizardSection>
               </section>
             </WizardSection>
 
@@ -466,11 +601,29 @@ export default function FHSAFlow() {
             )}
 
             {isOvercontribution && (
-              <div className="bg-qt-bg-3 border border-qt-border rounded-lg p-4 mb-6">
-                <p className="text-sm text-qt-primary">
-                  <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
-                  You've confirmed the signed T1-OVP form has been mailed to Questrade.
-                </p>
+              <div className="flex flex-col gap-4 mb-6">
+                <div className="bg-white border border-qt-border rounded-lg divide-y divide-qt-border">
+                  <SummaryRow label="Excess amount" value={ovpExcessAmount} />
+                  <SummaryRow
+                    label="Source of excess"
+                    value={ovpSource === 'cash' ? 'Cash deposit' : ovpSource === 'rrsp' ? 'RRSP transfer' : 'Cash + RRSP transfer'}
+                  />
+                  <SummaryRow
+                    label="Removal method"
+                    value={ovpRemovalMethod === 'withdrawal' ? 'Designated Withdrawal (Cash)' : 'Designated Transfer (RRSP/PRPP)'}
+                  />
+                  {ovpRemovalMethod === 'transfer' && ovpTransferAccount && (
+                    <SummaryRow
+                      label="Transfer to"
+                      value={(() => { const a = rrspAccounts.find((r) => r.id === ovpTransferAccount); return a ? `${a.label} - ${a.accountNumber}` : ''; })()}
+                    />
+                  )}
+                </div>
+                <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
+                  <Download size={16} />
+                  Download pre-filled RC727 form
+                </button>
+                <p className="text-xs text-qt-secondary">A copy will also be emailed to you.</p>
               </div>
             )}
 
