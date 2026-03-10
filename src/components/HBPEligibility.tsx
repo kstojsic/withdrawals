@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import RadioButton from './RadioButton';
 import InfoBox from './InfoBox';
+import QuestionGroup from './QuestionGroup';
 
 type YesNo = 'yes' | 'no' | null;
 
@@ -91,6 +92,18 @@ export default function HBPEligibility({ onEligibilityChange, onAnswersChange }:
     onAnswersChange?.(s);
   }, [s]);
 
+  const g1Terminal = s.residentOfCanada === 'no' || s.writtenAgreement === 'no';
+  const g1Done = s.residentOfCanada === 'yes' && s.writtenAgreement === 'yes'
+    && (s.personWithDisability === 'yes' || s.disabledPersonPurchase !== null);
+
+  const g2Terminal = s.previousHBP === 'yes' && s.repaymentBalanceZero === 'no';
+  const g2Done = g1Done && !g1Terminal && (s.previousHBP === 'no' || s.repaymentBalanceZero === 'yes');
+
+  const showG2 = g1Done && !g1Terminal;
+  const showG3 = g2Done && !g2Terminal;
+
+  const totalSteps = 3;
+
   return (
     <div>
       <p className="font-semibold text-base text-qt-primary leading-6 mb-1">Eligibility questions</p>
@@ -98,90 +111,93 @@ export default function HBPEligibility({ onEligibilityChange, onAnswersChange }:
         Please answer the following questions to determine your eligibility for the Home Buyers' Plan.
       </p>
 
-      <div className="flex flex-col gap-6">
-        <Question
-          q="Are you a resident of Canada?"
-          value={s.residentOfCanada}
-          onChange={(v) => set('residentOfCanada', v)}
-        />
+      <div className="flex flex-col gap-5">
+        {/* Group 1: Residency & Home Purchase Agreement */}
+        <QuestionGroup title="Residency & Agreement" step={1} totalSteps={totalSteps}>
+          <Question
+            q="Are you a resident of Canada?"
+            value={s.residentOfCanada}
+            onChange={(v) => set('residentOfCanada', v)}
+          />
 
-        {s.residentOfCanada === 'no' && <NotEligible reason="You must be a resident of Canada to participate in the Home Buyers' Plan." />}
+          {s.residentOfCanada === 'no' && <NotEligible reason="You must be a resident of Canada to participate in the Home Buyers' Plan." />}
 
-        {s.residentOfCanada === 'yes' && (
-          <>
+          {s.residentOfCanada === 'yes' && (
+            <>
+              <Question
+                q="Are you a person with a disability?"
+                value={s.personWithDisability}
+                onChange={(v) => set('personWithDisability', v)}
+              />
+
+              {s.personWithDisability === 'no' && (
+                <Question
+                  q="Are you making a withdrawal from your RRSP to buy or build a qualifying home for a specified disabled person or to help such a person buy or build a qualifying home?"
+                  value={s.disabledPersonPurchase}
+                  onChange={(v) => set('disabledPersonPurchase', v)}
+                  sub
+                />
+              )}
+
+              {(s.personWithDisability === 'yes' || s.disabledPersonPurchase !== null) && (
+                <Question
+                  q="Have you entered into a written agreement to buy or build a qualifying home?"
+                  value={s.writtenAgreement}
+                  onChange={(v) => set('writtenAgreement', v)}
+                />
+              )}
+
+              {s.writtenAgreement === 'no' && <NotEligible reason="You must have a written agreement to buy or build a qualifying home." />}
+            </>
+          )}
+        </QuestionGroup>
+
+        {/* Group 2: Previous HBP Participation */}
+        {showG2 && (
+          <QuestionGroup title="Previous HBP Participation" step={2} totalSteps={totalSteps}>
             <Question
-              q="Are you a person with a disability?"
-              value={s.personWithDisability}
-              onChange={(v) => set('personWithDisability', v)}
+              q="Before this year, have you ever withdrawn funds from your RRSP under the Home Buyers' Plan?"
+              value={s.previousHBP}
+              onChange={(v) => set('previousHBP', v)}
             />
 
-            {s.personWithDisability === 'no' && (
+            {s.previousHBP === 'yes' && (
               <Question
-                q="Are you making a withdrawal from your RRSP to buy or build a qualifying home for a specified disabled person or to help such a person buy or build a qualifying home?"
-                value={s.disabledPersonPurchase}
-                onChange={(v) => set('disabledPersonPurchase', v)}
+                q="Was the repayment balance $0 on January 1 of this year?"
+                value={s.repaymentBalanceZero}
+                onChange={(v) => set('repaymentBalanceZero', v)}
                 sub
               />
             )}
 
-            {(s.personWithDisability === 'yes' || s.disabledPersonPurchase !== null) && (
-              <Question
-                q="Have you entered into a written agreement to buy or build a qualifying home?"
-                value={s.writtenAgreement}
-                onChange={(v) => set('writtenAgreement', v)}
-              />
-            )}
+            {g2Terminal && <NotEligible reason="Your previous HBP repayment balance must be $0 on January 1 of this year." />}
+          </QuestionGroup>
+        )}
 
-            {s.writtenAgreement === 'no' && <NotEligible reason="You must have a written agreement to buy or build a qualifying home." />}
+        {/* Group 3: Home & Residence */}
+        {showG3 && (
+          <QuestionGroup title="Home & Residence" step={3} totalSteps={totalSteps}>
+            <Question
+              q="Do you intend to use the home as your primary residence within one year of buying or building it?"
+              value={s.intentPrimaryResidence}
+              onChange={(v) => set('intentPrimaryResidence', v)}
+            />
 
-            {s.writtenAgreement === 'yes' && (
+            {s.intentPrimaryResidence === 'no' && <NotEligible reason="You must intend to use the home as your primary residence within one year." />}
+
+            {s.intentPrimaryResidence === 'yes' && (
               <>
                 <Question
-                  q="Before this year, have you ever withdrawn funds from your RRSP under the Home Buyers' Plan?"
-                  value={s.previousHBP}
-                  onChange={(v) => set('previousHBP', v)}
+                  q="Have you or your spouse/common-law partner owned the qualifying home for more than 30 days before the withdrawal?"
+                  value={s.ownedQualifyingHome30Days}
+                  onChange={(v) => set('ownedQualifyingHome30Days', v)}
                 />
 
-                {s.previousHBP === 'yes' && (
-                  <Question
-                    q="Was the repayment balance $0 on January 1 of this year?"
-                    value={s.repaymentBalanceZero}
-                    onChange={(v) => set('repaymentBalanceZero', v)}
-                    sub
-                  />
-                )}
-
-                {s.previousHBP === 'yes' && s.repaymentBalanceZero === 'no' && (
-                  <NotEligible reason="Your previous HBP repayment balance must be $0 on January 1 of this year." />
-                )}
-
-                {(s.previousHBP === 'no' || s.repaymentBalanceZero === 'yes') && (
-                  <>
-                    <Question
-                      q="Do you intend to use the home as your primary residence within one year of buying or building it?"
-                      value={s.intentPrimaryResidence}
-                      onChange={(v) => set('intentPrimaryResidence', v)}
-                    />
-
-                    {s.intentPrimaryResidence === 'no' && <NotEligible reason="You must intend to use the home as your primary residence within one year." />}
-
-                    {s.intentPrimaryResidence === 'yes' && (
-                      <>
-                        <Question
-                          q="Have you or your spouse/common-law partner owned the qualifying home for more than 30 days before the withdrawal?"
-                          value={s.ownedQualifyingHome30Days}
-                          onChange={(v) => set('ownedQualifyingHome30Days', v)}
-                        />
-
-                        {s.ownedQualifyingHome30Days === 'yes' && renderOwnedYesBranch(s, set)}
-                        {s.ownedQualifyingHome30Days === 'no' && renderOwnedNoBranch(s, set)}
-                      </>
-                    )}
-                  </>
-                )}
+                {s.ownedQualifyingHome30Days === 'yes' && renderOwnedYesBranch(s, set)}
+                {s.ownedQualifyingHome30Days === 'no' && renderOwnedNoBranch(s, set)}
               </>
             )}
-          </>
+          </QuestionGroup>
         )}
 
         {eligibility === true && (
@@ -229,8 +245,6 @@ function renderOwnedYesBranch(
                 sub
               />
 
-              {s.ownOccupyPrincipalResidence === 'no' && null}
-
               {s.ownOccupyPrincipalResidence === 'yes' && (
                 <>
                   <Question
@@ -239,8 +253,6 @@ function renderOwnedYesBranch(
                     onChange={(v) => set('differentFromPrincipal', v)}
                     sub
                   />
-
-                  {s.differentFromPrincipal === 'yes' && null}
 
                   {s.differentFromPrincipal === 'no' && (
                     <>
@@ -276,8 +288,6 @@ function renderOwnedNoBranch(
         sub
       />
 
-      {s.ownedHomeBetween2022_2026 === 'no' && null}
-
       {s.ownedHomeBetween2022_2026 === 'yes' && (
         <>
           <Question
@@ -309,8 +319,6 @@ function renderOwnedNoBranch(
                     sub
                   />
 
-                  {s.sep_ownOccupyPrincipalResidence === 'no' && null}
-
                   {s.sep_ownOccupyPrincipalResidence === 'yes' && (
                     <>
                       <Question
@@ -319,8 +327,6 @@ function renderOwnedNoBranch(
                         onChange={(v) => set('sep_differentFromPrincipal', v)}
                         sub
                       />
-
-                      {s.sep_differentFromPrincipal === 'yes' && null}
 
                       {s.sep_differentFromPrincipal === 'no' && (
                         <>
@@ -401,7 +407,7 @@ function Question({
   sub?: boolean;
 }) {
   return (
-    <div className={`${sub ? 'ml-6 pl-4 border-l-2 border-qt-border' : ''} animate-[fadeSlideIn_0.3s_ease-out]`}>
+    <div className={`${sub ? 'ml-5 pl-4 border-l-2 border-qt-border' : ''}`}>
       <p className="text-sm text-qt-primary leading-[22px] mb-3">{q}</p>
       <div className="flex gap-6">
         <RadioButton
@@ -425,10 +431,8 @@ function Question({
 
 function NotEligible({ reason }: { reason: string }) {
   return (
-    <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-      <InfoBox variant="error">
-        <p><strong>Not eligible.</strong> {reason}</p>
-      </InfoBox>
-    </div>
+    <InfoBox variant="error">
+      <p><strong>Not eligible.</strong> {reason}</p>
+    </InfoBox>
   );
 }

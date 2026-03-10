@@ -129,8 +129,7 @@ export default function RRSPFlow() {
       (llpFormChoice === 'fillhere' && llpEligible && signed)
       || (llpFormChoice === 'upload' && llpUploadedFile)
     );
-  const canContinueOvercontribution =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && ovpFormMailed && confirmChecked;
+  
 
   function handleSubmit() {
     setSubmitted(true);
@@ -236,7 +235,7 @@ export default function RRSPFlow() {
             </WizardSection>
 
             {/* Currency Selection - combined amounts */}
-            <WizardSection visible={!!rrspType}>
+            <WizardSection visible={!!rrspType && !isOvercontribution}>
               <section>
                 <CurrencySelector
                   value={currency}
@@ -291,15 +290,49 @@ export default function RRSPFlow() {
               </section>
             </WizardSection>
 
-            {/* Overcontribution: Gross amount */}
-            <WizardSection visible={isOvercontribution && !!currency}>
-              <section>
-                <CurrencyInput
-                  label="Gross withdrawal amount"
-                  value={amount}
-                  onChange={setAmount}
-                  error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
-                />
+            {/* Overcontribution: Instructions only — no submission */}
+            <WizardSection visible={isOvercontribution}>
+              <section className="flex flex-col gap-5">
+                <InfoBox>
+                  <div className="flex flex-col gap-3">
+                    <p className="font-semibold">How to withdraw RRSP overcontributions</p>
+                    <p>
+                      To remove excess contributions from your RRSP, you'll need to complete the CRA's <strong>T3012A — Tax Deduction Waiver on the Refund of Your Undeducted RRSP, PRPP, or SPP Contributions</strong> form.
+                    </p>
+                    <p>Here's what to do:</p>
+                    <ol className="list-decimal ml-5 flex flex-col gap-1.5 text-sm">
+                      <li>Download and complete the <strong>T3012A</strong> form from the CRA website.</li>
+                      <li>Submit the form to the <strong>CRA</strong> for approval and their signature.</li>
+                      <li>Once you receive the CRA-approved form, mail it to Questrade at the address below.</li>
+                    </ol>
+                    <div className="bg-white/60 rounded-md p-3 mt-1">
+                      <p className="text-sm font-semibold text-qt-primary mb-1">Mail to:</p>
+                      <p className="text-sm text-qt-primary leading-relaxed">
+                        Questrade Inc.<br />
+                        5700 Yonge Street, Suite 1700<br />
+                        Toronto, ON M2M 4K2
+                      </p>
+                    </div>
+                    <a
+                      href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/t3012a.html"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-1"
+                    >
+                      Download T3012A form from Canada.ca &rarr;
+                    </a>
+                  </div>
+                </InfoBox>
+
+                <div className="border border-qt-border rounded-lg p-5 bg-qt-bg-3">
+                  <p className="text-sm text-qt-primary leading-relaxed">
+                    Once we receive your CRA-approved T3012A form in the mail, we'll process the withdrawal on your behalf and notify you by email. No further action is needed from you online.
+                  </p>
+                </div>
+
+                <Button variant="secondary" onClick={() => navigate('/')}>
+                  Return to accounts
+                </Button>
               </section>
             </WizardSection>
 
@@ -321,7 +354,7 @@ export default function RRSPFlow() {
             </WizardSection>
 
             {/* Method */}
-            <WizardSection visible={parsedAmount > 0 && !exceedsAvailable}>
+            <WizardSection visible={!isOvercontribution && parsedAmount > 0 && !exceedsAvailable}>
               <section>
                 <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} />
               </section>
@@ -530,22 +563,6 @@ export default function RRSPFlow() {
               </section>
             </WizardSection>
 
-            {/* LLP RC96 form download (fill here) */}
-            <WizardSection visible={isLLP && llpFormChoice === 'fillhere' && llpEligible}>
-              <section className="flex flex-col gap-4">
-                <div className="border border-qt-border rounded-lg p-5">
-                  <p className="font-semibold text-sm text-qt-primary mb-2">Pre-filled RC96 form</p>
-                  <p className="text-sm text-qt-secondary leading-[22px] mb-3">
-                    Based on your answers, we've pre-filled your RC96 (Lifelong Learning Plan — Request to Withdraw Funds From an RRSP) form.
-                  </p>
-                  <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
-                    <Download size={16} /> Download pre-filled RC96 form
-                  </button>
-                  <p className="text-xs text-qt-secondary mt-3">A copy will also be emailed to you.</p>
-                </div>
-              </section>
-            </WizardSection>
-
             {/* LLP E-sign + confirmation */}
             <WizardSection visible={isLLP && ((llpFormChoice === 'fillhere' && llpEligible) || (llpFormChoice === 'upload' && !!llpUploadedFile))}>
               <section className="flex flex-col gap-6">
@@ -575,67 +592,7 @@ export default function RRSPFlow() {
               </div>
             </WizardSection>
 
-            {/* Overcontribution: T1-OVP form + checkboxes */}
-            <WizardSection visible={isOvercontribution && !!bankReady}>
-              <section className="flex flex-col gap-6">
-                <InfoBox variant="warning">
-                  <div className="flex flex-col gap-2">
-                    <p className="font-semibold">T1-OVP form required</p>
-                    <p>
-                      To process an overcontribution withdrawal, you must complete the following steps:
-                    </p>
-                    <ol className="list-decimal ml-5 flex flex-col gap-1 text-sm">
-                      <li>Download and fill out the <strong>T1-OVP Individual Tax Return for RRSP, PRPP and SPP Excess Contributions</strong> form.</li>
-                      <li>Send the completed form to the <strong>CRA</strong> for their signature.</li>
-                      <li>Once you receive the CRA-signed form, sign it yourself.</li>
-                      <li>Mail the fully signed form to Questrade.</li>
-                    </ol>
-                    <a
-                      href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/t1-ovp.html"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-1"
-                    >
-                      Download T1-OVP form &rarr;
-                    </a>
-                  </div>
-                </InfoBox>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={ovpFormMailed}
-                    onChange={(e) => setOvpFormMailed(e.target.checked)}
-                    className="mt-1 size-4 accent-qt-green cursor-pointer"
-                  />
-                  <span className="text-sm text-qt-primary leading-[22px]">
-                    I have mailed the signed T1-OVP form and it is on the way to Questrade
-                  </span>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={confirmChecked}
-                    onChange={(e) => setConfirmChecked(e.target.checked)}
-                    className="mt-1 size-4 accent-qt-green cursor-pointer"
-                  />
-                  <span className="text-sm text-qt-primary leading-[22px]">
-                    I confirm that the information I've provided is true and accurate
-                  </span>
-                </label>
-              </section>
-            </WizardSection>
-
-            {/* Continue - Overcontribution */}
-            <WizardSection visible={isOvercontribution && !!canContinueOvercontribution}>
-              <div className="flex gap-3 pt-2 border-t border-qt-border">
-                <Button variant="secondary" onClick={() => navigate('/')}>Cancel</Button>
-                <Button onClick={() => { setShowSummary(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-                  Continue
-                </Button>
-              </div>
-            </WizardSection>
+            
           </div>
 
           <div className="mt-8">
@@ -749,15 +706,6 @@ export default function RRSPFlow() {
                 <p className="text-sm text-qt-primary">
                   <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
                   RC96 form uploaded: <span className="font-semibold">{llpUploadedFile.name}</span>
-                </p>
-              </div>
-            )}
-
-            {isOvercontribution && (
-              <div className="bg-qt-bg-3 border border-qt-border rounded-lg p-4 mb-6">
-                <p className="text-sm text-qt-primary">
-                  <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
-                  You've confirmed the signed T1-OVP form has been mailed to Questrade.
                 </p>
               </div>
             )}

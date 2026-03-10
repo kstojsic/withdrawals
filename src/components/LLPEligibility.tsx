@@ -3,6 +3,7 @@ import RadioButton from './RadioButton';
 import InputField from './InputField';
 import CurrencyInput from './CurrencyInput';
 import InfoBox from './InfoBox';
+import QuestionGroup from './QuestionGroup';
 import { formatCurrency } from '../data/accounts';
 
 type YesNo = 'yes' | 'no' | null;
@@ -148,14 +149,17 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
     onComplete(!!eligible, s);
   }, [eligible, s]);
 
-  const showQ3 = s.enrolled === 'yes';
-  const showQ4 = s.enrollmentType === 'part-time';
-  const showQ5 = s.enrollmentType === 'full-time' || (s.enrollmentType === 'part-time' && s.disabilityCondition === 'yes');
-  const showQ6 = s.previousWithdrawals === 'yes';
-  const showQ7 = s.previousWithdrawals === 'no' || (s.previousWithdrawals === 'yes' && s.afterFourthYear === 'no');
-  const showQ8 = showQ7 && lineA > 0;
-  const showQ8a = s.firstWithdrawalThisYear === 'no';
-  const showQ9 = showQ8 && s.firstWithdrawalThisYear !== null;
+  // Group visibility — each group stays visible once shown,
+  // terminal states render inside their own group
+  const g1Done = s.student !== null;
+  const enrollmentOk = s.enrollmentType === 'full-time' || (s.enrollmentType === 'part-time' && s.disabilityCondition === 'yes');
+  const g2Done = s.enrolled === 'yes' && enrollmentOk;
+  const g3Done = (s.previousWithdrawals === 'no' || (s.previousWithdrawals === 'yes' && s.afterFourthYear === 'no'));
+  const showG2 = g1Done;
+  const showG3 = showG2 && g2Done;
+  const showG4 = showG3 && g3Done && !isTerminal_afterFourthYear;
+
+  const totalSteps = 4;
 
   return (
     <div>
@@ -164,194 +168,192 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
         Please answer the following to determine your eligibility for the Lifelong Learning Plan.
       </p>
 
-      <div className="flex flex-col gap-6">
-        {/* Q1: LLP Student */}
-        <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-          <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">The LLP student</p>
-          <p className="text-xs text-qt-secondary mb-3">Select only one</p>
-          <div className="flex flex-col gap-3">
-            <RadioButton name="llp-student" value="you" label="You" checked={s.student === 'you'} onChange={() => set('student', 'you')} />
-            <RadioButton name="llp-student" value="spouse" label="Your spouse or common-law partner" checked={s.student === 'spouse'} onChange={() => set('student', 'spouse')} />
-          </div>
-        </div>
-
-        {s.student === 'spouse' && (
-          <div className="ml-6 pl-4 border-l-2 border-qt-border flex flex-col gap-4 animate-[fadeSlideIn_0.3s_ease-out]">
-            <InputField label="First name" value={s.spouseFirstName} onChange={(e) => set('spouseFirstName', e.target.value)} placeholder="Enter first name" />
-            <InputField label="Last name" value={s.spouseLastName} onChange={(e) => set('spouseLastName', e.target.value)} placeholder="Enter last name" />
-            <InputField label="Social Insurance Number (SIN)" value={s.spouseSIN} onChange={(e) => set('spouseSIN', e.target.value)} placeholder="e.g. 123-456-789" maxLength={11} />
-          </div>
-        )}
-
-        {s.student === 'you' && (
-          <div className="ml-6 pl-4 border-l-2 border-qt-border flex flex-col gap-4 animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-xs text-qt-secondary">Pre-filled from your account. You may edit if needed.</p>
-            <InputField label="First name" value={s.firstName} onChange={(e) => set('firstName', e.target.value)} placeholder="Enter first name" />
-            <InputField label="Last name" value={s.lastName} onChange={(e) => set('lastName', e.target.value)} placeholder="Enter last name" />
-            <InputField label="Social Insurance Number (SIN)" value={s.sin} onChange={(e) => set('sin', e.target.value)} placeholder="e.g. 123-456-789" maxLength={11} />
-          </div>
-        )}
-
-        {/* Q2 */}
-        {s.student !== null && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              Has the LLP student enrolled in a qualifying educational program at a designated educational institution, or received a written offer to enrol before March of next year in such a program?
-            </p>
-            <div className="flex gap-6">
-              <RadioButton name="llp-enrolled" value="yes" label="Yes" checked={s.enrolled === 'yes'} onChange={() => set('enrolled', 'yes')} />
-              <RadioButton name="llp-enrolled" value="no" label="No" checked={s.enrolled === 'no'} onChange={() => set('enrolled', 'no')} />
+      <div className="flex flex-col gap-5">
+        {/* Group 1: Student Information */}
+        <QuestionGroup title="Student Information" step={1} totalSteps={totalSteps}>
+          <div>
+            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">The LLP student</p>
+            <p className="text-xs text-qt-secondary mb-3">Select only one</p>
+            <div className="flex flex-col gap-3">
+              <RadioButton name="llp-student" value="you" label="You" checked={s.student === 'you'} onChange={() => set('student', 'you')} />
+              <RadioButton name="llp-student" value="spouse" label="Your spouse or common-law partner" checked={s.student === 'spouse'} onChange={() => set('student', 'spouse')} />
             </div>
           </div>
-        )}
 
-        {isTerminal_notEnrolled && <Terminal />}
+          {s.student === 'spouse' && (
+            <div className="ml-5 pl-4 border-l-2 border-qt-border flex flex-col gap-4">
+              <InputField label="First name" value={s.spouseFirstName} onChange={(e) => set('spouseFirstName', e.target.value)} placeholder="Enter first name" />
+              <InputField label="Last name" value={s.spouseLastName} onChange={(e) => set('spouseLastName', e.target.value)} placeholder="Enter last name" />
+              <InputField label="Social Insurance Number (SIN)" value={s.spouseSIN} onChange={(e) => set('spouseSIN', e.target.value)} placeholder="e.g. 123-456-789" maxLength={11} />
+            </div>
+          )}
 
-        {/* Q3 */}
-        {showQ3 && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              Is the student enrolling as a full-time student or a part-time student?
-            </p>
-            <div className="flex gap-6">
-              <RadioButton name="llp-enrollment-type" value="full-time" label="Full-time" checked={s.enrollmentType === 'full-time'} onChange={() => set('enrollmentType', 'full-time')} />
-              <RadioButton name="llp-enrollment-type" value="part-time" label="Part-time" checked={s.enrollmentType === 'part-time'} onChange={() => set('enrollmentType', 'part-time')} />
+          {s.student === 'you' && (
+            <div className="ml-5 pl-4 border-l-2 border-qt-border flex flex-col gap-4">
+              <p className="text-xs text-qt-secondary">Pre-filled from your account. You may edit if needed.</p>
+              <InputField label="First name" value={s.firstName} onChange={(e) => set('firstName', e.target.value)} placeholder="Enter first name" />
+              <InputField label="Last name" value={s.lastName} onChange={(e) => set('lastName', e.target.value)} placeholder="Enter last name" />
+              <InputField label="Social Insurance Number (SIN)" value={s.sin} onChange={(e) => set('sin', e.target.value)} placeholder="e.g. 123-456-789" maxLength={11} />
+            </div>
+          )}
+        </QuestionGroup>
+
+        {/* Group 2: Enrollment Details */}
+        {showG2 && (
+          <QuestionGroup title="Enrollment Details" step={2} totalSteps={totalSteps}>
+            <div>
+              <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                Has the LLP student enrolled in a qualifying educational program at a designated educational institution, or received a written offer to enrol before March of next year in such a program?
+              </p>
+              <div className="flex gap-6">
+                <RadioButton name="llp-enrolled" value="yes" label="Yes" checked={s.enrolled === 'yes'} onChange={() => set('enrolled', 'yes')} />
+                <RadioButton name="llp-enrolled" value="no" label="No" checked={s.enrolled === 'no'} onChange={() => set('enrolled', 'no')} />
+              </div>
             </div>
 
-            {/* Sub-question: disability (only for part-time) */}
-            {showQ4 && (
-              <div className="ml-6 pl-4 border-l-2 border-qt-border mt-4 animate-[fadeSlideIn_0.3s_ease-out]">
+            {isTerminal_notEnrolled && <Terminal />}
+
+            {s.enrolled === 'yes' && (
+              <div>
                 <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-                  Does the student meet one of the disability conditions explained in Guide RC4112?
+                  Is the student enrolling as a full-time student or a part-time student?
                 </p>
                 <div className="flex gap-6">
-                  <RadioButton name="llp-disability" value="yes" label="Yes" checked={s.disabilityCondition === 'yes'} onChange={() => set('disabilityCondition', 'yes')} />
-                  <RadioButton name="llp-disability" value="no" label="No" checked={s.disabilityCondition === 'no'} onChange={() => set('disabilityCondition', 'no')} />
+                  <RadioButton name="llp-enrollment-type" value="full-time" label="Full-time" checked={s.enrollmentType === 'full-time'} onChange={() => set('enrollmentType', 'full-time')} />
+                  <RadioButton name="llp-enrollment-type" value="part-time" label="Part-time" checked={s.enrollmentType === 'part-time'} onChange={() => set('enrollmentType', 'part-time')} />
                 </div>
-              </div>
-            )}
 
-            {isTerminal_noDisability && (
-              <div className="mt-4">
-                <Terminal />
+                {s.enrollmentType === 'part-time' && (
+                  <div className="ml-5 pl-4 border-l-2 border-qt-border mt-4">
+                    <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                      Does the student meet one of the disability conditions explained in Guide RC4112?
+                    </p>
+                    <div className="flex gap-6">
+                      <RadioButton name="llp-disability" value="yes" label="Yes" checked={s.disabilityCondition === 'yes'} onChange={() => set('disabilityCondition', 'yes')} />
+                      <RadioButton name="llp-disability" value="no" label="No" checked={s.disabilityCondition === 'no'} onChange={() => set('disabilityCondition', 'no')} />
+                    </div>
+                  </div>
+                )}
+
+                {isTerminal_noDisability && (
+                  <div className="mt-4"><Terminal /></div>
+                )}
               </div>
             )}
-          </div>
+          </QuestionGroup>
         )}
 
-        {/* Q4 */}
-        {showQ5 && !isTerminalEarly && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              Have you ever used the LLP before for this specific period of study?
-            </p>
-            <div className="flex gap-6">
-              <RadioButton name="llp-previous" value="yes" label="Yes" checked={s.previousWithdrawals === 'yes'} onChange={() => set('previousWithdrawals', 'yes')} />
-              <RadioButton name="llp-previous" value="no" label="No" checked={s.previousWithdrawals === 'no'} onChange={() => set('previousWithdrawals', 'no')} />
+        {/* Group 3: Previous LLP History */}
+        {showG3 && (
+          <QuestionGroup title="Previous LLP History" step={3} totalSteps={totalSteps}>
+            <div>
+              <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                Have you ever used the LLP before for this specific period of study?
+              </p>
+              <div className="flex gap-6">
+                <RadioButton name="llp-previous" value="yes" label="Yes" checked={s.previousWithdrawals === 'yes'} onChange={() => set('previousWithdrawals', 'yes')} />
+                <RadioButton name="llp-previous" value="no" label="No" checked={s.previousWithdrawals === 'no'} onChange={() => set('previousWithdrawals', 'no')} />
+              </div>
+
+              {s.previousWithdrawals === 'yes' && (
+                <div className="ml-5 pl-4 border-l-2 border-qt-border mt-4">
+                  <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
+                    We need to check if your withdrawal window is still open. Are either of the following statements true?
+                  </p>
+                  <ul className="list-disc ml-5 text-sm text-qt-secondary leading-[22px] mb-3">
+                    <li>It has been more than 4 years since your very first LLP withdrawal.</li>
+                    <li>You have already started making your annual LLP repayments back into your RRSP.</li>
+                  </ul>
+                  <div className="flex flex-col gap-3">
+                    <RadioButton name="llp-fourth-year" value="yes" label="Yes, one or both are true" checked={s.afterFourthYear === 'yes'} onChange={() => set('afterFourthYear', 'yes')} />
+                    <RadioButton name="llp-fourth-year" value="no" label="No, neither are true" checked={s.afterFourthYear === 'no'} onChange={() => set('afterFourthYear', 'no')} />
+                  </div>
+                </div>
+              )}
+
+              {isTerminal_afterFourthYear && (
+                <div className="mt-4"><Terminal /></div>
+              )}
+            </div>
+          </QuestionGroup>
+        )}
+
+        {/* Group 4: Withdrawal Amounts */}
+        {showG4 && (
+          <QuestionGroup title="Withdrawal Amounts" step={4} totalSteps={totalSteps}>
+            <div>
+              <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                How much do you want to withdraw?
+              </p>
+              <CurrencyInput
+                label="Withdrawal amount"
+                value={s.withdrawalAmount}
+                onChange={(v) => set('withdrawalAmount', v)}
+                max={10000}
+                maxLabel="$10,000.00 CAD per calendar year"
+              />
+              <p className="text-xs text-qt-secondary mt-1">Maximum $10,000 per calendar year</p>
             </div>
 
-            {/* Sub-question: withdrawal window check, only if Yes */}
-            {showQ6 && (
-              <div className="ml-6 pl-4 border-l-2 border-qt-border mt-4 animate-[fadeSlideIn_0.3s_ease-out]">
-                <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
-                  We need to check if your withdrawal window is still open. Are either of the following statements true?
+            {lineA > 0 && (
+              <div>
+                <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                  Is this your first LLP withdrawal this year?
                 </p>
-                <ul className="list-disc ml-5 text-sm text-qt-secondary leading-[22px] mb-3">
-                  <li>It has been more than 4 years since your very first LLP withdrawal.</li>
-                  <li>You have already started making your annual LLP repayments back into your RRSP.</li>
-                </ul>
-                <div className="flex flex-col gap-3">
-                  <RadioButton name="llp-fourth-year" value="yes" label="Yes, one or both are true" checked={s.afterFourthYear === 'yes'} onChange={() => set('afterFourthYear', 'yes')} />
-                  <RadioButton name="llp-fourth-year" value="no" label="No, neither are true" checked={s.afterFourthYear === 'no'} onChange={() => set('afterFourthYear', 'no')} />
+                <div className="flex gap-6">
+                  <RadioButton name="llp-first-year" value="yes" label="Yes" checked={s.firstWithdrawalThisYear === 'yes'} onChange={() => set('firstWithdrawalThisYear', 'yes')} />
+                  <RadioButton name="llp-first-year" value="no" label="No" checked={s.firstWithdrawalThisYear === 'no'} onChange={() => set('firstWithdrawalThisYear', 'no')} />
                 </div>
               </div>
             )}
 
-            {isTerminal_afterFourthYear && (
-              <div className="mt-4">
-                <Terminal />
+            {s.firstWithdrawalThisYear === 'no' && (
+              <div className="ml-5 pl-4 border-l-2 border-qt-border">
+                <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                  How much have you already withdrawn under the LLP this year?
+                </p>
+                <CurrencyInput
+                  label="Amount already withdrawn this year"
+                  value={s.alreadyWithdrawnThisYear}
+                  onChange={(v) => set('alreadyWithdrawnThisYear', v)}
+                />
+                {yearlyExceeds && (
+                  <div className="mt-3">
+                    <InfoBox variant="warning">
+                      <p>
+                        Your total withdrawals this year (Line A + Line B = {formatCurrency(lineA + lineB, 'CAD')}) exceed the $10,000 annual limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds the $10,000 limit.
+                      </p>
+                    </InfoBox>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* Q6 */}
-        {showQ7 && !isTerminal && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              How much do you want to withdraw?
-            </p>
-            <CurrencyInput
-              label="Withdrawal amount"
-              value={s.withdrawalAmount}
-              onChange={(v) => set('withdrawalAmount', v)}
-              max={10000}
-              maxLabel="$10,000.00 CAD per calendar year"
-            />
-            <p className="text-xs text-qt-secondary mt-1">Maximum $10,000 per calendar year</p>
-          </div>
-        )}
-
-        {/* Q8 */}
-        {showQ8 && !isTerminal && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              Is this your first LLP withdrawal this year?
-            </p>
-            <div className="flex gap-6">
-              <RadioButton name="llp-first-year" value="yes" label="Yes" checked={s.firstWithdrawalThisYear === 'yes'} onChange={() => set('firstWithdrawalThisYear', 'yes')} />
-              <RadioButton name="llp-first-year" value="no" label="No" checked={s.firstWithdrawalThisYear === 'no'} onChange={() => set('firstWithdrawalThisYear', 'no')} />
-            </div>
-          </div>
-        )}
-
-        {/* Q8a */}
-        {showQ8a && !isTerminal && (
-          <div className="ml-6 pl-4 border-l-2 border-qt-border animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              How much have you already withdrawn under the LLP this year?
-            </p>
-            <CurrencyInput
-              label="Amount already withdrawn this year"
-              value={s.alreadyWithdrawnThisYear}
-              onChange={(v) => set('alreadyWithdrawnThisYear', v)}
-            />
-            {yearlyExceeds && (
-              <div className="mt-3">
-                <InfoBox variant="warning">
-                  <p>
-                    Your total withdrawals this year (Line A + Line B = {formatCurrency(lineA + lineB, 'CAD')}) exceed the $10,000 annual limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds the $10,000 limit.
-                  </p>
-                </InfoBox>
+            {s.firstWithdrawalThisYear !== null && (
+              <div>
+                <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                  How much have you withdrawn under the LLP in previous years of your current LLP participation?
+                </p>
+                <CurrencyInput
+                  label="Previous years' withdrawals"
+                  value={s.previousYearsWithdrawn}
+                  onChange={(v) => set('previousYearsWithdrawn', v)}
+                />
+                <p className="text-xs text-qt-secondary mt-1">
+                  Do not include amounts that were included as income in your previous years' income tax and benefit returns because you exceeded the $10,000 limit.
+                </p>
+                {totalExceeds && (
+                  <div className="mt-3">
+                    <InfoBox variant="warning">
+                      <p>
+                        Your total LLP withdrawals (Line A + Line B + Line C = {formatCurrency(lineA + lineB + lineC, 'CAD')}) exceed the $20,000 lifetime limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds the $20,000 limit.
+                      </p>
+                    </InfoBox>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Q9 */}
-        {showQ9 && !isTerminal && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-            <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              How much have you withdrawn under the LLP in previous years of your current LLP participation?
-            </p>
-            <CurrencyInput
-              label="Previous years' withdrawals"
-              value={s.previousYearsWithdrawn}
-              onChange={(v) => set('previousYearsWithdrawn', v)}
-            />
-            <p className="text-xs text-qt-secondary mt-1">
-              Do not include amounts that were included as income in your previous years' income tax and benefit returns because you exceeded the $10,000 limit.
-            </p>
-            {totalExceeds && (
-              <div className="mt-3">
-                <InfoBox variant="warning">
-                  <p>
-                    Your total LLP withdrawals (Line A + Line B + Line C = {formatCurrency(lineA + lineB + lineC, 'CAD')}) exceed the $20,000 lifetime limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds the $20,000 limit.
-                  </p>
-                </InfoBox>
-              </div>
-            )}
-          </div>
+          </QuestionGroup>
         )}
 
         {questionsComplete && !yearlyExceeds && !totalExceeds && (
@@ -366,10 +368,8 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
 
 function Terminal({ message }: { message?: string }) {
   return (
-    <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-      <InfoBox variant="error">
-        <p><strong>{message || 'Not eligible for a Lifelong Learning Plan withdrawal.'}</strong></p>
-      </InfoBox>
-    </div>
+    <InfoBox variant="error">
+      <p><strong>{message || 'Not eligible for a Lifelong Learning Plan withdrawal.'}</strong></p>
+    </InfoBox>
   );
 }

@@ -4,6 +4,7 @@ import CurrencyInput from './CurrencyInput';
 import AddressInput from './AddressInput';
 import ESignature from './ESignature';
 import InfoBox from './InfoBox';
+import QuestionGroup from './QuestionGroup';
 
 type YesNo = 'yes' | 'no' | null;
 
@@ -99,29 +100,32 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
   const t_noAgreement = s.hasAgreement === 'no';
   const t_notPrimary = s.primaryResidence === 'no';
 
-  const isTerminalEarly = t_notResident || t_wontRemain;
-  const isTerminalStep2 = t_ownedHome || t_over30;
-  const isTerminalStep3 = t_noAgreement || t_notPrimary;
-  const isTerminal = isTerminalEarly || isTerminalStep2 || isTerminalStep3;
+  const isTerminalG1 = t_notResident || t_wontRemain;
+  const isTerminalG2 = t_ownedHome || t_over30;
+  const isTerminalG3 = t_noAgreement || t_notPrimary;
+  const isTerminal = isTerminalG1 || isTerminalG2 || isTerminalG3;
 
-  const showQ2 = s.resident === 'yes';
-  const showStep2 = s.remainResident === 'yes';
-  const showQ4 = s.ownedHome === 'no';
-  const showStep3 = showQ4 && (s.takenOwnership === 'not_yet' || s.takenOwnership === 'within_30');
-  const showQ6 = s.hasAgreement === 'yes';
-  const showStep4 = showQ6 && s.primaryResidence === 'yes';
-  const showQ9 = showStep4 && s.street !== '' && s.city !== '' && s.province !== '' && s.postalCode !== '';
+  const g1Done = s.resident === 'yes' && s.remainResident === 'yes';
+  const g2Done = s.ownedHome === 'no' && (s.takenOwnership === 'not_yet' || s.takenOwnership === 'within_30');
+  const g3Done = s.hasAgreement === 'yes' && s.primaryResidence === 'yes';
 
+  const showG2 = g1Done && !isTerminalG1;
+  const showG3 = showG2 && g2Done && !isTerminalG2;
+  const showG4 = showG3 && g3Done && !isTerminalG3;
+
+  const showQ9 = showG4 && s.street !== '' && s.city !== '' && s.province !== '' && s.postalCode !== '';
   const parsedAmount = parseFloat(s.withdrawalAmount) || 0;
 
   const eligible =
-    !isTerminal && showStep4 && parsedAmount > 0 &&
+    !isTerminal && showG4 && parsedAmount > 0 &&
     s.street !== '' && s.city !== '' && s.province !== '' && s.postalCode !== '' &&
     s.signed && s.agreed;
 
   useEffect(() => {
     onComplete(!!eligible, s);
   }, [eligible, s]);
+
+  const totalSteps = 4;
 
   return (
     <div>
@@ -130,39 +134,40 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
         Please answer the following to determine your eligibility for a qualifying FHSA withdrawal.
       </p>
 
-      <div className="flex flex-col gap-6">
-        {/* Step 1: Residency */}
-        <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-          <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-            Are you currently a resident of Canada?
-          </p>
-          <div className="flex gap-6">
-            <RadioButton name="fhsa-resident" value="yes" label="Yes" checked={s.resident === 'yes'} onChange={() => set('resident', 'yes')} />
-            <RadioButton name="fhsa-resident" value="no" label="No" checked={s.resident === 'no'} onChange={() => set('resident', 'no')} />
-          </div>
-        </div>
-
-        {t_notResident && <Terminal msg="You must be a resident of Canada to make a tax-free qualifying withdrawal." />}
-
-        {showQ2 && (
-          <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+      <div className="flex flex-col gap-5">
+        {/* Group 1: Residency */}
+        <QuestionGroup title="Residency" step={1} totalSteps={totalSteps}>
+          <div>
             <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-              Will you remain a resident of Canada until you take ownership of your new home?
+              Are you currently a resident of Canada?
             </p>
             <div className="flex gap-6">
-              <RadioButton name="fhsa-remain" value="yes" label="Yes" checked={s.remainResident === 'yes'} onChange={() => set('remainResident', 'yes')} />
-              <RadioButton name="fhsa-remain" value="no" label="No" checked={s.remainResident === 'no'} onChange={() => set('remainResident', 'no')} />
+              <RadioButton name="fhsa-resident" value="yes" label="Yes" checked={s.resident === 'yes'} onChange={() => set('resident', 'yes')} />
+              <RadioButton name="fhsa-resident" value="no" label="No" checked={s.resident === 'no'} onChange={() => set('resident', 'no')} />
             </div>
           </div>
-        )}
 
-        {t_wontRemain && <Terminal msg="You must remain a resident of Canada until you buy or build the home to qualify." />}
+          {t_notResident && <Terminal msg="You must be a resident of Canada to make a tax-free qualifying withdrawal." />}
 
-        {/* Step 2: First-Time Home Buyer */}
-        {showStep2 && !isTerminalEarly && (
-          <>
+          {s.resident === 'yes' && (
+            <div>
+              <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                Will you remain a resident of Canada until you take ownership of your new home?
+              </p>
+              <div className="flex gap-6">
+                <RadioButton name="fhsa-remain" value="yes" label="Yes" checked={s.remainResident === 'yes'} onChange={() => set('remainResident', 'yes')} />
+                <RadioButton name="fhsa-remain" value="no" label="No" checked={s.remainResident === 'no'} onChange={() => set('remainResident', 'no')} />
+              </div>
+            </div>
+          )}
 
-            <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+          {t_wontRemain && <Terminal msg="You must remain a resident of Canada until you buy or build the home to qualify." />}
+        </QuestionGroup>
+
+        {/* Group 2: First-Time Home Buyer Status */}
+        {showG2 && (
+          <QuestionGroup title="Home Buyer Status" step={2} totalSteps={totalSteps}>
+            <div>
               <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
                 Have you lived in a home that you owned (or co-owned) as your primary residence at any point this year, or in the past 4 calendar years?
               </p>
@@ -177,8 +182,8 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
 
             {t_ownedHome && <Terminal msg="You do not qualify as a first-time home buyer for this withdrawal. Any funds withdrawn will be subject to withholding tax." />}
 
-            {showQ4 && (
-              <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+            {s.ownedHome === 'no' && (
+              <div>
                 <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
                   Have you already taken ownership of the new home you are buying?
                 </p>
@@ -191,13 +196,13 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
             )}
 
             {t_over30 && <Terminal msg="You must withdraw your FHSA funds within 30 days of taking ownership of the home. You no longer qualify for a tax-free withdrawal." />}
-          </>
+          </QuestionGroup>
         )}
 
-        {/* Step 3: Purchase Agreement */}
-        {showStep3 && !isTerminalEarly && !isTerminalStep2 && (
-          <>
-            <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+        {/* Group 3: Purchase Agreement */}
+        {showG3 && (
+          <QuestionGroup title="Purchase Agreement" step={3} totalSteps={totalSteps}>
+            <div>
               <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
                 Do you have a signed, written agreement to buy or build a home in Canada before October 1st of next year?
               </p>
@@ -209,8 +214,8 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
 
             {t_noAgreement && <Terminal msg="Not eligible for this withdrawal. You must have a formal written agreement in place before you can withdraw your FHSA funds." />}
 
-            {showQ6 && (
-              <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+            {s.hasAgreement === 'yes' && (
+              <div>
                 <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
                   Do you plan to move into this home and make it your primary residence within one year of buying or building it?
                 </p>
@@ -222,25 +227,23 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
             )}
 
             {t_notPrimary && <Terminal msg="FHSA funds can only be used to purchase a primary residence, not investment properties or secondary homes." />}
-          </>
+          </QuestionGroup>
         )}
 
-        {/* Step 4: Property & Withdrawal Details */}
-        {showStep4 && !isTerminal && (
-          <>
+        {/* Group 4: Property & Withdrawal Details */}
+        {showG4 && (
+          <QuestionGroup title="Property & Withdrawal Details" step={4} totalSteps={totalSteps}>
             <InfoBox variant="success">
               <p className="font-semibold">You are eligible for a tax-free qualifying FHSA withdrawal.</p>
             </InfoBox>
 
-            <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-              <AddressInput
-                value={{ street: s.street, city: s.city, province: s.province, postalCode: s.postalCode }}
-                onChange={(a) => setS((prev) => ({ ...prev, street: a.street, city: a.city, province: a.province, postalCode: a.postalCode }))}
-              />
-            </div>
+            <AddressInput
+              value={{ street: s.street, city: s.city, province: s.province, postalCode: s.postalCode }}
+              onChange={(a) => setS((prev) => ({ ...prev, street: a.street, city: a.city, province: a.province, postalCode: a.postalCode }))}
+            />
 
             {showQ9 && (
-              <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+              <div>
                 <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
                   How much would you like to withdraw tax-free today?
                 </p>
@@ -255,9 +258,8 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
               </div>
             )}
 
-            {/* Step 5: Certification */}
             {showQ9 && parsedAmount > 0 && (
-              <div className="animate-[fadeSlideIn_0.3s_ease-out] flex flex-col gap-6">
+              <div className="flex flex-col gap-6">
                 <ESignature onSign={() => set('signed', true as never)} signed={s.signed} />
 
                 <div className="border border-qt-border rounded-lg p-5 bg-qt-bg-3">
@@ -278,7 +280,7 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
                 </div>
               </div>
             )}
-          </>
+          </QuestionGroup>
         )}
       </div>
     </div>
@@ -287,10 +289,8 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
 
 function Terminal({ msg }: { msg: string }) {
   return (
-    <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-      <InfoBox variant="error">
-        <p><strong>Not eligible.</strong> {msg}</p>
-      </InfoBox>
-    </div>
+    <InfoBox variant="error">
+      <p><strong>Not eligible.</strong> {msg}</p>
+    </InfoBox>
   );
 }
