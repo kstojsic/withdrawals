@@ -164,6 +164,8 @@ export default function RESPFlow() {
   const maxAmount = currency === 'CAD' ? combinedTotalCad : currency === 'USD' ? combinedTotalUsd : 0;
   const parsedAmount = parseFloat(amount) || 0;
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
+  const singleCurrencyBalance = currency === 'CAD' ? totalCad : currency === 'USD' ? totalUsd : 0;
+  const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
   const fee = method === 'wire' ? 20 : method === 'international_wire' ? 40 : 0;
 
   const isEAPPSE = respType === 'eap_pse';
@@ -173,6 +175,8 @@ export default function RESPFlow() {
   const combinedGrowthCad = growthCad + growthUsd * FX_RATE;
   const combinedGrowthUsd = growthCad / FX_RATE + growthUsd;
   const aipMaxAmount = currency === 'CAD' ? combinedGrowthCad : currency === 'USD' ? combinedGrowthUsd : 0;
+  const singleGrowthBalance = currency === 'CAD' ? growthCad : currency === 'USD' ? growthUsd : 0;
+  const aipTriggersConversion = parsedAmount > singleGrowthBalance && parsedAmount <= aipMaxAmount && parsedAmount > 0;
 
   // T1172 calculation
   const t1172_line1 = parseFloat(aipTotalAIP) || 0;
@@ -195,6 +199,8 @@ export default function RESPFlow() {
   const capMaxAmount = currency === 'CAD' ? combinedContribCad : currency === 'USD' ? combinedContribUsd : 0;
   const capParsedAmount = parseFloat(capAmount) || 0;
   const capExceedsAvailable = capParsedAmount > capMaxAmount && capParsedAmount > 0;
+  const singleContribBalance = currency === 'CAD' ? contribCad : currency === 'USD' ? contribUsd : 0;
+  const capTriggersConversion = capParsedAmount > singleContribBalance && !capExceedsAvailable && capParsedAmount > 0;
 
   const bankReady = method === 'international_wire'
     ? intlWire.bankName && intlWire.swiftCode
@@ -380,6 +386,11 @@ export default function RESPFlow() {
                   onChange={setAmount}
                   error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
                 />
+                {triggersConversion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                  </div>
+                )}
               </section>
             </WizardSection>
 
@@ -543,6 +554,11 @@ export default function RESPFlow() {
                           onChange={(v) => setAmount(v)}
                           error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
                         />
+                        {triggersConversion && (
+                          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                            <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -729,6 +745,11 @@ export default function RESPFlow() {
                   error={exceedsAvailable ? `Amount exceeds available contributions of ${formatCurrency(capMaxAmount, currency!)}` : undefined}
                   max={capMaxAmount}
                 />
+                {capTriggersConversion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                  </div>
+                )}
               </section>
             </WizardSection>
 
@@ -822,6 +843,7 @@ export default function RESPFlow() {
                       value={amount}
                       onChange={(v) => { setAmount(v); setCapAmount(v); }}
                       error={capExceedsAvailable ? `Amount exceeds available contributions of ${formatCurrency(capMaxAmount, currency!)}` : undefined}
+                      max={capMaxAmount}
                     />
                   </div>
                 )}
@@ -982,6 +1004,11 @@ export default function RESPFlow() {
                   error={parsedAmount > aipMaxAmount && parsedAmount > 0 ? `Amount exceeds available growth of ${formatCurrency(aipMaxAmount, currency!)}` : undefined}
                   max={aipMaxAmount}
                 />
+                {aipTriggersConversion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                  </div>
+                )}
               </section>
             </WizardSection>
 
@@ -1271,6 +1298,7 @@ export default function RESPFlow() {
                       value={amount}
                       onChange={setAmount}
                       error={parsedAmount > aipMaxAmount && parsedAmount > 0 ? `Amount exceeds available growth of ${formatCurrency(aipMaxAmount, currency!)}` : undefined}
+                      max={aipMaxAmount}
                     />
                   </div>
                 )}
@@ -1333,10 +1361,6 @@ export default function RESPFlow() {
                 </Button>
               </div>
             </WizardSection>
-          </div>
-
-          <div className="mt-8">
-            <a href="#" className="text-xs font-semibold text-qt-green-dark hover:underline">View disclosure</a>
           </div>
         </div>
       </main>
@@ -1448,7 +1472,7 @@ export default function RESPFlow() {
               )}
 
               <div className="flex items-center justify-between px-5 py-4 bg-qt-bg-3">
-                <p className="font-semibold text-base text-qt-primary">Estimated amount received</p>
+                <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
                 <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
               </div>
             </div>

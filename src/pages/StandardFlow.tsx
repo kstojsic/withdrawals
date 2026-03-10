@@ -67,6 +67,8 @@ export default function StandardFlow() {
   const maxAmount = currency === 'CAD' ? combinedCad : currency === 'USD' ? combinedUsd : 0;
   const parsedAmount = parseFloat(amount) || 0;
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
+  const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
+  const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
   const fee = method === 'wire' ? 20 : method === 'international_wire' ? 40 : 0;
   const netAmount = parsedAmount - fee;
 
@@ -140,7 +142,7 @@ export default function StandardFlow() {
                 </>
               )}
               <div className="flex items-center justify-between px-5 py-4 bg-qt-bg-3">
-                <p className="font-semibold text-base text-qt-primary">Estimated amount received</p>
+                <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
                 <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, netAmount), currency || 'CAD')}</p>
               </div>
             </div>
@@ -203,6 +205,13 @@ export default function StandardFlow() {
                     Available: {formatCurrency(maxAmount, currency)}
                   </p>
                 )}
+                {triggersConversion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800">
+                      Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.
+                    </p>
+                  </div>
+                )}
               </section>
             </WizardSection>
 
@@ -249,10 +258,6 @@ export default function StandardFlow() {
                 </Button>
               </div>
             </WizardSection>
-          </div>
-
-          <div className="mt-8">
-            <a href="#" className="text-xs font-semibold text-qt-green-dark hover:underline">View disclosure</a>
           </div>
           <div ref={bottomRef} />
         </div>

@@ -44,9 +44,10 @@ interface FHSAEligibilityProps {
   onComplete: (eligible: boolean, data: FHSAState) => void;
   withdrawalAmount: string;
   onWithdrawalAmountChange: (val: string) => void;
+  maxAmount?: number;
 }
 
-export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange }: FHSAEligibilityProps) {
+export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange, maxAmount }: FHSAEligibilityProps) {
   const [s, setS] = useState<FHSAState>({ ...initialState, withdrawalAmount });
 
   useEffect(() => {
@@ -251,6 +252,7 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
                   label="Withdrawal amount"
                   value={s.withdrawalAmount}
                   onChange={(v) => set('withdrawalAmount', v)}
+                  max={maxAmount}
                 />
                 <p className="text-xs text-qt-secondary mt-1">
                   There is no maximum limit for a qualifying FHSA withdrawal. You may withdraw your entire balance.

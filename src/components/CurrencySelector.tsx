@@ -59,7 +59,7 @@ function CurrencyBox({
         {label}
       </p>
       <p className="text-xs text-qt-secondary">
-        Available up to <span className="font-semibold text-qt-primary">{formatCurrency(amount, currency)}</span>
+        Withdraw up to {formatCurrency(amount, currency)}
       </p>
     </button>
   );

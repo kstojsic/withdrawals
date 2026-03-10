@@ -50,7 +50,7 @@ export default function LinkBankModal({ onClose, onSave }: LinkBankModalProps) {
                   <Building2 size={18} className="text-qt-green-dark" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-sm text-qt-primary">Connect via aggregator</p>
+                  <p className="font-semibold text-sm text-qt-primary">Connect automatically</p>
                   <p className="text-xs text-qt-secondary">Securely link your bank using online banking credentials</p>
                 </div>
                 <ChevronRight size={18} className="text-qt-gray-dark" />

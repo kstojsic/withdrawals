@@ -107,6 +107,8 @@ export default function RRSPFlow() {
   const maxAmount = currency === 'CAD' ? combinedCad : currency === 'USD' ? combinedUsd : 0;
   const parsedAmount = parseFloat(amount) || 0;
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
+  const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
+  const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
   const fee = method === 'wire' ? 20 : method === 'international_wire' ? 40 : 0;
 
   const isDeregistration = rrspType === 'deregistration';
@@ -268,6 +270,11 @@ export default function RRSPFlow() {
                         Amount exceeds available balance of {formatCurrency(maxAmount, currency!)}
                       </p>
                     )}
+                    {triggersConversion && (
+                      <p className="text-sm text-amber-800 mt-2">
+                        Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.
+                      </p>
+                    )}
                   </div>
                 )}
               </section>
@@ -286,6 +293,11 @@ export default function RRSPFlow() {
                 />
                 {!exceedsAvailable && (
                   <p className="text-xs text-qt-secondary mt-1">Maximum: $60,000.00 CAD</p>
+                )}
+                {triggersConversion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                  </div>
                 )}
               </section>
             </WizardSection>
@@ -350,6 +362,11 @@ export default function RRSPFlow() {
                 {!exceedsAvailable && (
                   <p className="text-xs text-qt-secondary mt-1">Maximum: $10,000.00 CAD per calendar year &middot; $20,000.00 CAD lifetime</p>
                 )}
+                {triggersConversion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                  </div>
+                )}
               </section>
             </WizardSection>
 
@@ -396,6 +413,14 @@ export default function RRSPFlow() {
                     To meet government requirements, we need a completed T1036 form to process your request. Tell us how you'd like to complete your withdrawal form.
                   </p>
                 </div>
+                <button type="button" onClick={() => { setHbpFormChoice('fillhere'); setHbpUploadedFile(null); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${hbpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
+                  </div>
+                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
+                </button>
                 <button type="button" onClick={() => { setHbpFormChoice('upload'); setHbpEligible(null); }}
                   className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${hbpFormChoice === 'upload' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
                   <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
@@ -404,14 +429,6 @@ export default function RRSPFlow() {
                     className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2">
                     Download T1036 from Canada.ca &rarr;
                   </a>
-                </button>
-                <button type="button" onClick={() => { setHbpFormChoice('fillhere'); setHbpUploadedFile(null); }}
-                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${hbpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
-                  </div>
-                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
                 </button>
               </section>
             </WizardSection>
@@ -505,6 +522,14 @@ export default function RRSPFlow() {
                     To meet government requirements, we need a completed RC96 form to process your request. Tell us how you'd like to complete your withdrawal form.
                   </p>
                 </div>
+                <button type="button" onClick={() => { setLlpFormChoice('fillhere'); setLlpUploadedFile(null); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${llpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
+                  </div>
+                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
+                </button>
                 <button type="button" onClick={() => { setLlpFormChoice('upload'); setLlpEligible(false); setLlpData({}); }}
                   className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${llpFormChoice === 'upload' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
                   <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
@@ -513,14 +538,6 @@ export default function RRSPFlow() {
                     className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2">
                     Download RC96 from Canada.ca &rarr;
                   </a>
-                </button>
-                <button type="button" onClick={() => { setLlpFormChoice('fillhere'); setLlpUploadedFile(null); }}
-                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${llpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
-                  </div>
-                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
                 </button>
               </section>
             </WizardSection>
@@ -559,6 +576,7 @@ export default function RRSPFlow() {
                   onComplete={(elig, data) => { setLlpEligible(elig); setLlpData(data as unknown as Record<string, unknown>); }}
                   withdrawalAmount={amount}
                   onWithdrawalAmountChange={setAmount}
+                  maxAmount={maxAmount}
                 />
               </section>
             </WizardSection>
@@ -593,10 +611,6 @@ export default function RRSPFlow() {
             </WizardSection>
 
             
-          </div>
-
-          <div className="mt-8">
-            <a href="#" className="text-xs font-semibold text-qt-green-dark hover:underline">View disclosure</a>
           </div>
         </div>
       </main>
@@ -671,7 +685,7 @@ export default function RRSPFlow() {
                 </>
               )}
               <div className="flex items-center justify-between px-5 py-4 bg-qt-bg-3">
-                <p className="font-semibold text-base text-qt-primary">Estimated amount received</p>
+                <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
                 <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
               </div>
             </div>

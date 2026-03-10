@@ -21,7 +21,7 @@ export default function BankSelector({ value, onChange, allBanks, onBanksChange 
 
   return (
     <div>
-      <p className="font-semibold text-sm text-qt-primary mb-3">Select bank account</p>
+      <p className="font-semibold text-sm text-qt-primary mb-3">Select bank account for deposit</p>
       <div className="flex flex-col gap-2">
         {allBanks.map((bank) => (
           <button
