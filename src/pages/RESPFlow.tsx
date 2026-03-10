@@ -53,7 +53,6 @@ export default function RESPFlow() {
   // EAP & PSE questionnaire state
   const [beneficiary, setBeneficiary] = useState<string | null>(null);
   const [residency, setResidency] = useState<'resident' | 'non_resident' | null>(null);
-  const [amountChoice, setAmountChoice] = useState<'full' | 'partial' | null>(null);
   const [distribution, setDistribution] = useState<'auto' | 'specify' | null>(null);
   const [eapSpecificAmount, setEapSpecificAmount] = useState('');
   const [pseSpecificAmount, setPseSpecificAmount] = useState('');
@@ -113,7 +112,6 @@ export default function RESPFlow() {
     setShowSummary(false);
     setBeneficiary(null);
     setResidency(null);
-    setAmountChoice(null);
     setDistribution(null);
     setEapSpecificAmount('');
     setPseSpecificAmount('');
@@ -209,13 +207,7 @@ export default function RESPFlow() {
   const selectedBeneficiary = account?.respBeneficiaries?.find((b) => b.id === beneficiary) || null;
   const hasJoint = !!account?.jointSubscriber;
 
-  const fullBalanceForCurrency = currency === 'CAD' ? combinedTotalCad : combinedTotalUsd;
 
-  useEffect(() => {
-    if (amountChoice === 'full' && currency) {
-      setAmount(fullBalanceForCurrency.toFixed(2));
-    }
-  }, [amountChoice, currency, fullBalanceForCurrency]);
 
   const residencyOk = residency === 'resident';
   const beneficiaryReady = !!beneficiary && residencyOk;
@@ -321,7 +313,6 @@ export default function RESPFlow() {
                     setConfirmChecked(false);
                     setBeneficiary(null);
                     setResidency(null);
-                    setAmountChoice(null);
                     setDistribution(null);
                     setEapSpecificAmount('');
                     setPseSpecificAmount('');
@@ -370,7 +361,7 @@ export default function RESPFlow() {
               <section>
                 <CurrencySelector
                   value={currency}
-                  onChange={(c) => { setCurrency(c); setAmount(''); setAmountChoice(null); }}
+                  onChange={(c) => { setCurrency(c); setAmount(''); }}
                   cadAmount={combinedTotalCad}
                   usdAmount={combinedTotalUsd}
                 />
@@ -512,60 +503,8 @@ export default function RESPFlow() {
                   </div>
                 )}
 
-                {/* Q3: How much */}
-                {residencyOk && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-                      How much would you like to withdraw?
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <RadioButton
-                        name="resp-amount-choice"
-                        value="full"
-                        label={`Full balance (${formatCurrency(fullBalanceForCurrency, currency!)})`}
-                        checked={amountChoice === 'full'}
-                        onChange={() => {
-                          setAmountChoice('full');
-                          setAmount(fullBalanceForCurrency.toFixed(2));
-                          setDistribution(null);
-                          setEapSpecificAmount('');
-                          setPseSpecificAmount('');
-                        }}
-                      />
-                      <RadioButton
-                        name="resp-amount-choice"
-                        value="partial"
-                        label="Partial amount"
-                        checked={amountChoice === 'partial'}
-                        onChange={() => {
-                          setAmountChoice('partial');
-                          setAmount('');
-                          setDistribution(null);
-                          setEapSpecificAmount('');
-                          setPseSpecificAmount('');
-                        }}
-                      />
-                    </div>
-                    {amountChoice === 'partial' && (
-                      <div className="mt-4 animate-[fadeSlideIn_0.3s_ease-out]">
-                        <CurrencyInput
-                          label="Withdrawal amount"
-                          value={amount}
-                          onChange={(v) => setAmount(v)}
-                          error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
-                        />
-                        {triggersConversion && (
-                          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-                            <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Q4: Distribution (partial only) */}
-                {amountChoice === 'partial' && parsedAmount > 0 && !exceedsAvailable && (
+                {/* Q4: Distribution */}
+                {residencyOk && parsedAmount > 0 && !exceedsAvailable && (
                   <div className="animate-[fadeSlideIn_0.3s_ease-out]">
                     <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
                       How would you like the funds distributed?
@@ -612,7 +551,7 @@ export default function RESPFlow() {
                 )}
 
                 {/* Q6: Funds recipient */}
-                {((amountChoice === 'full') || (amountChoice === 'partial' && parsedAmount > 0 && (distribution === 'auto' || distribution === 'specify'))) && (
+                {residencyOk && parsedAmount > 0 && !exceedsAvailable && (distribution === 'auto' || distribution === 'specify') && (
                   <div className="animate-[fadeSlideIn_0.3s_ease-out]">
                     <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
                       Who should the funds be sent to?
@@ -834,19 +773,6 @@ export default function RESPFlow() {
                     </div>
                   )}
                 </div>
-
-                {/* Q2: Capital amount */}
-                {capPurpose === 'capital' && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <CurrencyInput
-                      label="How much capital would you like to withdraw?"
-                      value={amount}
-                      onChange={(v) => { setAmount(v); setCapAmount(v); }}
-                      error={capExceedsAvailable ? `Amount exceeds available contributions of ${formatCurrency(capMaxAmount, currency!)}` : undefined}
-                      max={capMaxAmount}
-                    />
-                  </div>
-                )}
 
                 {/* Q3: Prior EAP */}
                 {capPurpose === 'capital' && capParsedAmount > 0 && !capExceedsAvailable && (
@@ -1290,19 +1216,6 @@ export default function RESPFlow() {
                   </div>
                 )}
 
-                {/* Withdrawal amount sync */}
-                {aipChoice && aipResident === 'yes' && (aipWithdrawalReady || (aipRolloverReady || (aipPriorTransfers === 'no' && aipWithinLimit === 'yes'))) && aipChoice === 'withdrawal' && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <CurrencyInput
-                      label="How much would you like to withdraw?"
-                      value={amount}
-                      onChange={setAmount}
-                      error={parsedAmount > aipMaxAmount && parsedAmount > 0 ? `Amount exceeds available growth of ${formatCurrency(aipMaxAmount, currency!)}` : undefined}
-                      max={aipMaxAmount}
-                    />
-                  </div>
-                )}
-
                 {/* Close RESP acknowledgment */}
                 {((aipWithdrawalReady) || (aipRolloverReady) || (aipChoice === 'rollover' && aipPriorTransfers === 'no' && aipWithinLimit === 'yes' && !lifetimeExceeded && aipDestInstitution && aipDestAccount && rolloverAmount > 0)) && (
                   <div className="animate-[fadeSlideIn_0.3s_ease-out]">
@@ -1499,7 +1412,7 @@ export default function RESPFlow() {
 /* ---------- RESP Balance Card ---------- */
 
 function RESPBalanceCard({ account }: { account: Account }) {
-  const [combined, setCombined] = useState(false);
+  const [combined, setCombined] = useState(true);
   const bd = account.respBreakdown!;
 
   const contribCad = combined ? bd.contributions.cad + bd.contributions.usd * FX_RATE : bd.contributions.cad;
@@ -1518,7 +1431,7 @@ function RESPBalanceCard({ account }: { account: Account }) {
   return (
     <div className="border border-qt-border rounded-lg overflow-hidden shadow-sm">
       <div className="flex items-center justify-between px-5 py-3 bg-qt-bg-3 border-b border-qt-border">
-        <p className="font-semibold text-sm text-qt-primary">Account Balance</p>
+        <p className="font-semibold text-sm text-qt-primary">Available to Withdraw</p>
         <button
           onClick={() => setCombined((c) => !c)}
           className="flex items-center gap-2 text-xs font-semibold text-qt-green-dark hover:underline cursor-pointer"

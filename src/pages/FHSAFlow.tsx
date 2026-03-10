@@ -440,7 +440,6 @@ export default function FHSAFlow() {
                   onComplete={(elig, data) => { setQualifyingEligible(elig); setQualifyingData(data as unknown as Record<string, unknown>); }}
                   withdrawalAmount={amount}
                   onWithdrawalAmountChange={setAmount}
-                  maxAmount={maxAmount}
                 />
               </section>
             </WizardSection>

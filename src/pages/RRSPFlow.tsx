@@ -576,7 +576,6 @@ export default function RRSPFlow() {
                   onComplete={(elig, data) => { setLlpEligible(elig); setLlpData(data as unknown as Record<string, unknown>); }}
                   withdrawalAmount={amount}
                   onWithdrawalAmountChange={setAmount}
-                  maxAmount={maxAmount}
                 />
               </section>
             </WizardSection>

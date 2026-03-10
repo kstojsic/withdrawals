@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import RadioButton from './RadioButton';
-import CurrencyInput from './CurrencyInput';
 import AddressInput from './AddressInput';
 import ESignature from './ESignature';
 import InfoBox from './InfoBox';
@@ -44,10 +43,9 @@ interface FHSAEligibilityProps {
   onComplete: (eligible: boolean, data: FHSAState) => void;
   withdrawalAmount: string;
   onWithdrawalAmountChange: (val: string) => void;
-  maxAmount?: number;
 }
 
-export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange, maxAmount }: FHSAEligibilityProps) {
+export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange }: FHSAEligibilityProps) {
   const [s, setS] = useState<FHSAState>({ ...initialState, withdrawalAmount });
 
   useEffect(() => {
@@ -244,23 +242,6 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
             />
 
             {showQ9 && (
-              <div>
-                <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-                  How much would you like to withdraw tax-free today?
-                </p>
-                <CurrencyInput
-                  label="Withdrawal amount"
-                  value={s.withdrawalAmount}
-                  onChange={(v) => set('withdrawalAmount', v)}
-                  max={maxAmount}
-                />
-                <p className="text-xs text-qt-secondary mt-1">
-                  There is no maximum limit for a qualifying FHSA withdrawal. You may withdraw your entire balance.
-                </p>
-              </div>
-            )}
-
-            {showQ9 && parsedAmount > 0 && (
               <div className="flex flex-col gap-6">
                 <ESignature onSign={() => set('signed', true as never)} signed={s.signed} />
 

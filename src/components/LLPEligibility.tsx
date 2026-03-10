@@ -50,10 +50,9 @@ interface LLPEligibilityProps {
   onComplete: (eligible: boolean, data: LLPState) => void;
   withdrawalAmount: string;
   onWithdrawalAmountChange: (val: string) => void;
-  maxAmount?: number;
 }
 
-export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange, maxAmount }: LLPEligibilityProps) {
+export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange }: LLPEligibilityProps) {
   const [s, setS] = useState<LLPState>({ ...initialState, withdrawalAmount });
 
   useEffect(() => {
@@ -282,20 +281,6 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
         {/* Group 4: Withdrawal Amounts */}
         {showG4 && (
           <QuestionGroup title="Withdrawal Amounts" step={4} totalSteps={totalSteps}>
-            <div>
-              <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-                How much do you want to withdraw?
-              </p>
-              <CurrencyInput
-                label="Withdrawal amount"
-                value={s.withdrawalAmount}
-                onChange={(v) => set('withdrawalAmount', v)}
-                max={maxAmount !== undefined ? Math.min(10000, maxAmount) : 10000}
-                maxLabel="$10,000.00 CAD per calendar year"
-              />
-              <p className="text-xs text-qt-secondary mt-1">Maximum $10,000 per calendar year</p>
-            </div>
-
             {lineA > 0 && (
               <div>
                 <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
