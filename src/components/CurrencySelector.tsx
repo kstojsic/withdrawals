@@ -14,14 +14,14 @@ export default function CurrencySelector({ value, onChange, cadAmount, usdAmount
       <p className="font-semibold text-sm text-qt-primary mb-3">Select currency</p>
       <div className="grid grid-cols-2 gap-3">
         <CurrencyBox
-          label="Combined CAD"
+          label="CAD"
           currency="CAD"
           amount={cadAmount}
           selected={value === 'CAD'}
           onClick={() => onChange('CAD')}
         />
         <CurrencyBox
-          label="Combined USD"
+          label="USD"
           currency="USD"
           amount={usdAmount}
           selected={value === 'USD'}

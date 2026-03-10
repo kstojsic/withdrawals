@@ -1,108 +1,49 @@
-import { useRef, useState, useEffect, type MouseEvent, type TouchEvent } from 'react';
-import Button from './Button';
+import { useState } from 'react';
 
 interface ESignatureProps {
-  onSign: (dataUrl: string) => void;
+  onSign: (value: string) => void;
   signed: boolean;
+  label?: string;
 }
 
-export default function ESignature({ onSign, signed }: ESignatureProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
-  const [hasContent, setHasContent] = useState(false);
+export default function ESignature({ onSign, signed, label = 'Confirmation' }: ESignatureProps) {
+  const [initials, setInitials] = useState('');
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#262D33';
-  }, []);
-
-  function getPos(e: MouseEvent | TouchEvent) {
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    if ('touches' in e) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      };
+  function handleConfirm() {
+    if (initials.trim().length > 0) {
+      onSign(initials.trim());
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
-
-  function startDraw(e: MouseEvent | TouchEvent) {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    setDrawing(true);
-    const pos = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-  }
-
-  function draw(e: MouseEvent | TouchEvent) {
-    if (!drawing) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    const pos = getPos(e);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    setHasContent(true);
-  }
-
-  function endDraw() {
-    setDrawing(false);
-  }
-
-  function clearSignature() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setHasContent(false);
-  }
-
-  function handleAccept() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    onSign(canvas.toDataURL());
   }
 
   return (
     <div>
-      <p className="text-sm leading-[22px] text-qt-primary mb-2">E-Signature</p>
-      <p className="text-xs text-qt-secondary mb-3">Draw your signature in the box below</p>
-      <div className={`border-2 rounded-lg overflow-hidden ${signed ? 'border-qt-green' : 'border-qt-border'}`}>
-        <canvas
-          ref={canvasRef}
-          width={560}
-          height={120}
-          className="w-full cursor-crosshair bg-white touch-none"
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={endDraw}
-          onMouseLeave={endDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={endDraw}
+      <p className="text-sm leading-[22px] text-qt-primary mb-2">{label}</p>
+      <p className="text-xs text-qt-secondary mb-3">Type in your initials to confirm</p>
+      <div className="flex items-center gap-3">
+        <input
+          type="text"
+          value={signed ? initials : initials}
+          onChange={(e) => { if (!signed) setInitials(e.target.value.toUpperCase()); }}
+          placeholder="e.g. AC"
+          maxLength={5}
+          disabled={signed}
+          className={`w-28 h-12 rounded-md border-2 px-4 text-center text-lg font-bold tracking-widest uppercase outline-none transition-colors
+            ${signed
+              ? 'border-qt-green bg-qt-green-bg/30 text-qt-green-dark'
+              : 'border-qt-border focus:border-qt-green bg-white text-qt-primary'
+            }`}
         />
-      </div>
-      <div className="flex items-center gap-3 mt-2">
-        <button
-          type="button"
-          onClick={clearSignature}
-          className="text-sm text-qt-secondary hover:text-qt-primary cursor-pointer"
-        >
-          Clear
-        </button>
-        {hasContent && !signed && (
-          <Button size="sm" onClick={handleAccept}>Accept signature</Button>
+        {initials.trim().length > 0 && !signed && (
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className="h-10 px-4 rounded-md bg-qt-green text-white text-sm font-semibold cursor-pointer hover:bg-qt-green-dark transition-colors"
+          >
+            Confirm
+          </button>
         )}
         {signed && (
-          <span className="text-sm font-semibold text-qt-green-dark">Signature accepted</span>
+          <span className="text-sm font-semibold text-qt-green-dark">Confirmed</span>
         )}
       </div>
     </div>

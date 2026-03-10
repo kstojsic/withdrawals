@@ -276,13 +276,10 @@ export default function RESPFlow() {
     );
   }
 
-  if (showSummary && account) {
-    return renderSummary();
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-qt-white">
       <TopNav showExit onExit={() => navigate('/')} />
+      {showSummary && account && renderSummary()}
       <main className="flex-1">
         <div className="max-w-[680px] mx-auto w-full px-6 py-10">
           <h1 className="font-display text-[28px] leading-[38px] text-qt-primary mb-6">
@@ -1362,13 +1359,13 @@ export default function RESPFlow() {
       : 'QT RESP Withdrawal form';
 
     return (
-      <div className="min-h-screen flex flex-col bg-qt-white">
-        <TopNav showExit onExit={() => setShowSummary(false)} />
-        <main className="flex-1">
-          <div className="max-w-[680px] mx-auto w-full px-6 py-10">
-            <h2 className="font-display text-[28px] leading-[38px] text-qt-primary mb-6">
-              Review & confirm
-            </h2>
+      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto" onClick={() => setShowSummary(false)}>
+        <div className="w-full max-w-[680px] mx-auto bg-white rounded-2xl shadow-2xl my-10" onClick={(e) => e.stopPropagation()}>
+          <div className="px-6 py-6 border-b border-qt-border flex items-center justify-between">
+            <h2 className="font-display text-[22px] leading-[30px] text-qt-primary">Review & confirm</h2>
+            <button type="button" onClick={() => setShowSummary(false)} className="text-qt-secondary hover:text-qt-primary text-sm font-semibold cursor-pointer">Close</button>
+          </div>
+          <div className="px-6 py-6">
 
             <div className="bg-white border border-qt-border rounded-lg divide-y divide-qt-border mb-6">
               <SummaryRow label="Subscriber" value={account.subscriberName || ''} />
@@ -1468,12 +1465,8 @@ export default function RESPFlow() {
               <Button variant="secondary" onClick={() => setShowSummary(false)}>Back</Button>
               <Button onClick={handleSubmit}>Submit withdrawal</Button>
             </div>
-
-            <div className="mt-6">
-              <a href="#" className="text-xs font-semibold text-qt-green-dark hover:underline">View disclosure</a>
-            </div>
           </div>
-        </main>
+        </div>
       </div>
     );
   }

@@ -76,8 +76,8 @@ export default function BalanceCard({ account }: BalanceCardProps) {
             <MarginRow
               label={
                 <span className="inline-flex items-center gap-1.5">
-                  Buying Power
-                  <Tooltip content="If you withdraw from your Buying Power, you will be charged interest" />
+                  Margin
+                  <Tooltip content="If you withdraw from your Margin, you will be charged interest" />
                 </span>
               }
               cad={combined ? account.marginBreakdown!.buyingPower.cad + account.marginBreakdown!.buyingPower.usd * FX_RATE : account.marginBreakdown!.buyingPower.cad}

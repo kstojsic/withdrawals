@@ -50,7 +50,11 @@ export default function RRSPFlow() {
     otherBrokerageAccount: '',
   });
   const [signed, setSigned] = useState(false);
+  const [hbpFormChoice, setHbpFormChoice] = useState<'upload' | 'fillhere' | null>(null);
+  const [hbpUploadedFile, setHbpUploadedFile] = useState<File | null>(null);
   const [hbpEligible, setHbpEligible] = useState<boolean | null>(null);
+  const [llpFormChoice, setLlpFormChoice] = useState<'upload' | 'fillhere' | null>(null);
+  const [llpUploadedFile, setLlpUploadedFile] = useState<File | null>(null);
   const [llpEligible, setLlpEligible] = useState(false);
   const [llpData, setLlpData] = useState<Record<string, unknown>>({});
   const [ovpFormMailed, setOvpFormMailed] = useState(false);
@@ -83,7 +87,11 @@ export default function RRSPFlow() {
     setMethod(null);
     setSelectedBank(null);
     setGrossAmount(0);
+    setHbpFormChoice(null);
+    setHbpUploadedFile(null);
     setHbpEligible(null);
+    setLlpFormChoice(null);
+    setLlpUploadedFile(null);
     setLlpEligible(false);
     setLlpData({});
     setOvpFormMailed(false);
@@ -112,10 +120,15 @@ export default function RRSPFlow() {
 
   const canContinueDeregistration = currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
   const canContinueHBP =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && hbpEligible === true &&
-    address.street && address.city && signed && confirmChecked;
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && confirmChecked && (
+      (hbpFormChoice === 'fillhere' && hbpEligible === true && address.street && address.city && signed)
+      || (hbpFormChoice === 'upload' && hbpUploadedFile)
+    );
   const canContinueLLP =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && llpEligible && signed && confirmChecked;
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && confirmChecked && (
+      (llpFormChoice === 'fillhere' && llpEligible && signed)
+      || (llpFormChoice === 'upload' && llpUploadedFile)
+    );
   const canContinueOvercontribution =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && ovpFormMailed && confirmChecked;
 
@@ -151,13 +164,10 @@ export default function RRSPFlow() {
     );
   }
 
-  if (showSummary && account) {
-    return renderSummary();
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-qt-white">
       <TopNav showExit onExit={() => navigate('/')} />
+      {showSummary && account && renderSummary()}
       <main className="flex-1">
         <div className="max-w-[680px] mx-auto w-full px-6 py-10">
           <h1 className="font-display text-[28px] leading-[38px] text-qt-primary mb-6">
@@ -189,7 +199,11 @@ export default function RRSPFlow() {
                     setMethod(null);
                     setSelectedBank(null);
                     setGrossAmount(0);
+                    setHbpFormChoice(null);
+                    setHbpUploadedFile(null);
                     setHbpEligible(null);
+                    setLlpFormChoice(null);
+                    setLlpUploadedFile(null);
                     setLlpEligible(false);
                     setLlpData({});
                     setOvpFormMailed(false);
@@ -340,24 +354,78 @@ export default function RRSPFlow() {
               </section>
             </WizardSection>
 
-            {/* HBP Eligibility */}
+            {/* HBP Form Choice */}
             <WizardSection visible={isHBP && !!bankReady}>
-              <section>
-                <HBPEligibility
-                  onEligibilityChange={setHbpEligible}
-                />
+              <section className="flex flex-col gap-4">
+                <div>
+                  <p className="font-semibold text-sm text-qt-primary mb-1">T1036 — Home Buyers' Plan form</p>
+                  <p className="text-sm text-qt-secondary leading-relaxed">
+                    To meet government requirements, we need a completed T1036 form to process your request. Tell us how you'd like to complete your withdrawal form.
+                  </p>
+                </div>
+                <button type="button" onClick={() => { setHbpFormChoice('upload'); setHbpEligible(null); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${hbpFormChoice === 'upload' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
+                  <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
+                  <p className="text-sm text-qt-secondary leading-relaxed">Download, sign, and upload your document manually.</p>
+                  <a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/t1036.html" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2">
+                    Download T1036 from Canada.ca &rarr;
+                  </a>
+                </button>
+                <button type="button" onClick={() => { setHbpFormChoice('fillhere'); setHbpUploadedFile(null); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${hbpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
+                  </div>
+                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
+                </button>
               </section>
             </WizardSection>
 
-            {/* HBP Address */}
-            <WizardSection visible={isHBP && hbpEligible === true}>
+            {/* HBP Upload */}
+            <WizardSection visible={isHBP && hbpFormChoice === 'upload'}>
+              <section className="flex flex-col gap-4">
+                <p className="font-semibold text-sm text-qt-primary">Upload your completed T1036 form</p>
+                <div className="border-2 border-dashed border-qt-border rounded-lg p-8 text-center hover:border-qt-gray-dark transition-colors cursor-pointer"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files?.[0]) setHbpUploadedFile(e.dataTransfer.files[0]); }}
+                  onClick={() => document.getElementById('hbp-upload')?.click()}>
+                  <input id="hbp-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) setHbpUploadedFile(e.target.files[0]); }} />
+                  {hbpUploadedFile ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <CheckCircle2 size={24} className="text-qt-green" />
+                      <p className="text-sm font-semibold text-qt-primary">{hbpUploadedFile.name}</p>
+                      <p className="text-xs text-qt-secondary">Click or drag to replace</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Download size={24} className="text-qt-secondary rotate-180" />
+                      <p className="text-sm text-qt-primary">Drag & drop your file here, or <span className="font-semibold text-qt-green-dark">browse</span></p>
+                      <p className="text-xs text-qt-secondary">Accepted formats: PDF, JPG, PNG</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </WizardSection>
+
+            {/* HBP Eligibility (fill here) */}
+            <WizardSection visible={isHBP && hbpFormChoice === 'fillhere'}>
+              <section>
+                <HBPEligibility onEligibilityChange={setHbpEligible} />
+              </section>
+            </WizardSection>
+
+            {/* HBP Address (fill here) */}
+            <WizardSection visible={isHBP && hbpFormChoice === 'fillhere' && hbpEligible === true}>
               <section>
                 <AddressInput value={address} onChange={setAddress} />
               </section>
             </WizardSection>
 
             {/* HBP E-sign + confirmation */}
-            <WizardSection visible={isHBP && hbpEligible === true && !!address.street}>
+            <WizardSection visible={isHBP && ((hbpFormChoice === 'fillhere' && hbpEligible === true && !!address.street) || (hbpFormChoice === 'upload' && !!hbpUploadedFile))}>
               <section className="flex flex-col gap-6">
                 {method !== 'international_wire' && (
                   <ESignature onSign={() => setSigned(true)} signed={signed} />
@@ -367,15 +435,9 @@ export default function RRSPFlow() {
                     I certify that the information I've provided is correct and complete, and I authorize this withdrawal from my RRSP.
                   </p>
                   <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={confirmChecked}
-                      onChange={(e) => setConfirmChecked(e.target.checked)}
-                      className="mt-1 size-4 accent-qt-green cursor-pointer"
-                    />
-                    <span className="text-sm font-semibold text-qt-primary leading-[22px]">
-                      I agree
-                    </span>
+                    <input type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)}
+                      className="mt-1 size-4 accent-qt-green cursor-pointer" />
+                    <span className="text-sm font-semibold text-qt-primary leading-[22px]">I agree</span>
                   </label>
                 </div>
               </section>
@@ -401,8 +463,64 @@ export default function RRSPFlow() {
               </div>
             </WizardSection>
 
-            {/* LLP Eligibility */}
+            {/* LLP Form Choice */}
             <WizardSection visible={isLLP && !!bankReady}>
+              <section className="flex flex-col gap-4">
+                <div>
+                  <p className="font-semibold text-sm text-qt-primary mb-1">RC96 — Lifelong Learning Plan form</p>
+                  <p className="text-sm text-qt-secondary leading-relaxed">
+                    To meet government requirements, we need a completed RC96 form to process your request. Tell us how you'd like to complete your withdrawal form.
+                  </p>
+                </div>
+                <button type="button" onClick={() => { setLlpFormChoice('upload'); setLlpEligible(false); setLlpData({}); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${llpFormChoice === 'upload' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
+                  <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
+                  <p className="text-sm text-qt-secondary leading-relaxed">Download, sign, and upload your document manually.</p>
+                  <a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/rc96.html" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2">
+                    Download RC96 from Canada.ca &rarr;
+                  </a>
+                </button>
+                <button type="button" onClick={() => { setLlpFormChoice('fillhere'); setLlpUploadedFile(null); }}
+                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${llpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
+                  </div>
+                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
+                </button>
+              </section>
+            </WizardSection>
+
+            {/* LLP Upload */}
+            <WizardSection visible={isLLP && llpFormChoice === 'upload'}>
+              <section className="flex flex-col gap-4">
+                <p className="font-semibold text-sm text-qt-primary">Upload your completed RC96 form</p>
+                <div className="border-2 border-dashed border-qt-border rounded-lg p-8 text-center hover:border-qt-gray-dark transition-colors cursor-pointer"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files?.[0]) setLlpUploadedFile(e.dataTransfer.files[0]); }}
+                  onClick={() => document.getElementById('llp-upload')?.click()}>
+                  <input id="llp-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) setLlpUploadedFile(e.target.files[0]); }} />
+                  {llpUploadedFile ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <CheckCircle2 size={24} className="text-qt-green" />
+                      <p className="text-sm font-semibold text-qt-primary">{llpUploadedFile.name}</p>
+                      <p className="text-xs text-qt-secondary">Click or drag to replace</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Download size={24} className="text-qt-secondary rotate-180" />
+                      <p className="text-sm text-qt-primary">Drag & drop your file here, or <span className="font-semibold text-qt-green-dark">browse</span></p>
+                      <p className="text-xs text-qt-secondary">Accepted formats: PDF, JPG, PNG</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </WizardSection>
+
+            {/* LLP Eligibility (fill here) */}
+            <WizardSection visible={isLLP && llpFormChoice === 'fillhere'}>
               <section>
                 <LLPEligibility
                   onComplete={(elig, data) => { setLlpEligible(elig); setLlpData(data as unknown as Record<string, unknown>); }}
@@ -412,27 +530,24 @@ export default function RRSPFlow() {
               </section>
             </WizardSection>
 
-            {/* LLP RC96 form */}
-            <WizardSection visible={isLLP && llpEligible}>
+            {/* LLP RC96 form download (fill here) */}
+            <WizardSection visible={isLLP && llpFormChoice === 'fillhere' && llpEligible}>
               <section className="flex flex-col gap-4">
                 <div className="border border-qt-border rounded-lg p-5">
                   <p className="font-semibold text-sm text-qt-primary mb-2">Pre-filled RC96 form</p>
                   <p className="text-sm text-qt-secondary leading-[22px] mb-3">
-                    Based on your answers, we've pre-filled your RC96 (Lifelong Learning Plan — Request to Withdraw Funds From an RRSP) form. Please review it for accuracy.
+                    Based on your answers, we've pre-filled your RC96 (Lifelong Learning Plan — Request to Withdraw Funds From an RRSP) form.
                   </p>
                   <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
-                    <Download size={16} />
-                    Download pre-filled RC96 form
+                    <Download size={16} /> Download pre-filled RC96 form
                   </button>
-                  <p className="text-xs text-qt-secondary mt-3">
-                    A copy of this form will also be emailed to you for your records.
-                  </p>
+                  <p className="text-xs text-qt-secondary mt-3">A copy will also be emailed to you.</p>
                 </div>
               </section>
             </WizardSection>
 
             {/* LLP E-sign + confirmation */}
-            <WizardSection visible={isLLP && llpEligible}>
+            <WizardSection visible={isLLP && ((llpFormChoice === 'fillhere' && llpEligible) || (llpFormChoice === 'upload' && !!llpUploadedFile))}>
               <section className="flex flex-col gap-6">
                 {method !== 'international_wire' && (
                   <ESignature onSign={() => setSigned(true)} signed={signed} />
@@ -442,15 +557,9 @@ export default function RRSPFlow() {
                     I certify that the information I've provided is correct and complete, and I authorize this withdrawal from my RRSP.
                   </p>
                   <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={confirmChecked}
-                      onChange={(e) => setConfirmChecked(e.target.checked)}
-                      className="mt-1 size-4 accent-qt-green cursor-pointer"
-                    />
-                    <span className="text-sm font-semibold text-qt-primary leading-[22px]">
-                      I agree
-                    </span>
+                    <input type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)}
+                      className="mt-1 size-4 accent-qt-green cursor-pointer" />
+                    <span className="text-sm font-semibold text-qt-primary leading-[22px]">I agree</span>
                   </label>
                 </div>
               </section>
@@ -558,13 +667,15 @@ export default function RRSPFlow() {
       : `${llpData.firstName || 'Anastasia'} ${llpData.lastName || 'Carmichael'} (You)`;
 
     return (
-      <div className="min-h-screen flex flex-col bg-qt-white">
-        <TopNav showExit onExit={() => setShowSummary(false)} />
-        <main className="flex-1">
-          <div className="max-w-[680px] mx-auto w-full px-6 py-10">
-            <h2 className="font-display text-[28px] leading-[38px] text-qt-primary mb-6">
+      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto" onClick={() => setShowSummary(false)}>
+        <div className="w-full max-w-[680px] mx-auto bg-white rounded-2xl shadow-2xl my-10" onClick={(e) => e.stopPropagation()}>
+          <div className="px-6 py-6 border-b border-qt-border flex items-center justify-between">
+            <h2 className="font-display text-[22px] leading-[30px] text-qt-primary">
               Review & confirm
             </h2>
+            <button type="button" onClick={() => setShowSummary(false)} className="text-qt-secondary hover:text-qt-primary text-sm font-semibold cursor-pointer">Close</button>
+          </div>
+          <div className="px-6 py-6">
 
             {isHBP && (
               <div className="bg-white border border-qt-border rounded-lg divide-y divide-qt-border mb-6">
@@ -608,22 +719,37 @@ export default function RRSPFlow() {
               </div>
             </div>
 
-            {isHBP && (
+            {isHBP && hbpFormChoice === 'fillhere' && (
               <div className="mb-6">
                 <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
-                  <Download size={16} />
-                  Download pre-filled T1036 form
+                  <Download size={16} /> Download pre-filled T1036 form
                 </button>
+                <p className="text-xs text-qt-secondary mt-2">A copy will also be emailed to you.</p>
+              </div>
+            )}
+            {isHBP && hbpFormChoice === 'upload' && hbpUploadedFile && (
+              <div className="bg-qt-bg-3 border border-qt-border rounded-lg p-4 mb-6">
+                <p className="text-sm text-qt-primary">
+                  <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
+                  T1036 form uploaded: <span className="font-semibold">{hbpUploadedFile.name}</span>
+                </p>
               </div>
             )}
 
-            {isLLP && (
+            {isLLP && llpFormChoice === 'fillhere' && (
               <div className="mb-6">
                 <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
-                  <Download size={16} />
-                  Download pre-filled RC96 form
+                  <Download size={16} /> Download pre-filled RC96 form
                 </button>
                 <p className="text-xs text-qt-secondary mt-2">A copy will also be emailed to you.</p>
+              </div>
+            )}
+            {isLLP && llpFormChoice === 'upload' && llpUploadedFile && (
+              <div className="bg-qt-bg-3 border border-qt-border rounded-lg p-4 mb-6">
+                <p className="text-sm text-qt-primary">
+                  <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
+                  RC96 form uploaded: <span className="font-semibold">{llpUploadedFile.name}</span>
+                </p>
               </div>
             )}
 
@@ -640,12 +766,8 @@ export default function RRSPFlow() {
               <Button variant="secondary" onClick={() => setShowSummary(false)}>Back</Button>
               <Button onClick={handleSubmit}>Submit withdrawal</Button>
             </div>
-
-            <div className="mt-6">
-              <a href="#" className="text-xs font-semibold text-qt-green-dark hover:underline">View disclosure</a>
-            </div>
           </div>
-        </main>
+        </div>
       </div>
     );
   }
