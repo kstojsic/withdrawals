@@ -32,9 +32,9 @@ export default function Tooltip({ content, children }: TooltipProps) {
         {children || <Info size={16} className="text-qt-gray-dark" />}
       </span>
       {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 w-64 p-3 text-sm leading-[20px] text-white bg-qt-primary rounded-lg shadow-lg pointer-events-none">
+        <span className="absolute bottom-full left-1/2 mb-2 z-50 w-64 p-3 text-sm leading-[20px] text-white bg-qt-primary rounded-lg shadow-lg pointer-events-none">
           {content}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-qt-primary" />
+          <span className="absolute top-full left-2 border-4 border-transparent border-t-qt-primary" />
         </span>
       )}
     </span>
