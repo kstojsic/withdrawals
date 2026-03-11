@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, ChevronDown } from 'lucide-react';
-import TopNav from '../components/TopNav';
 import Tooltip from '../components/Tooltip';
 import AccountDropdown from '../components/AccountDropdown';
 import BalanceCard from '../components/BalanceCard';
@@ -164,8 +163,7 @@ export default function FHSAFlow() {
   if (submitted && account) {
     const typeLabel = isQualifying ? 'qualifying FHSA' : isNonQualifying ? 'non-qualifying FHSA' : 'FHSA overcontribution';
     return (
-      <div className="min-h-screen flex flex-col bg-qt-white">
-        <TopNav />
+      <div className="flex flex-col min-h-0">
         <div className="flex-1 flex items-center justify-center">
           <div className="max-w-md text-center px-6">
             <div className="size-16 rounded-full bg-qt-green-bg flex items-center justify-center mx-auto mb-6">
@@ -190,8 +188,7 @@ export default function FHSAFlow() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-qt-white">
-      <TopNav showExit onExit={() => navigate('/')} />
+    <div className="flex flex-col min-h-0">
       {showSummary && account && renderSummary()}
       <main className="flex-1">
         <div className="max-w-[680px] mx-auto w-full px-6 py-10">
@@ -774,6 +771,11 @@ export default function FHSAFlow() {
                 <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
                 <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
               </div>
+              {((currency === 'CAD' && parsedAmount > 50000) || (currency === 'USD' && parsedAmount > 25000)) && (
+                <div className="px-5 py-3 bg-amber-50 border-t border-amber-300">
+                  <p className="text-sm text-amber-800">This amount is more than $50k CAD or $25k USD, so it will be processed in multiple withdrawals.</p>
+                </div>
+              )}
             </div>
 
             {isQualifying && qualifyingFormChoice === 'fillhere' && (

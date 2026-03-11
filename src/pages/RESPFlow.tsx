@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, ChevronDown, Upload, X } from 'lucide-react';
-import TopNav from '../components/TopNav';
 import Tooltip from '../components/Tooltip';
 import AccountDropdown from '../components/AccountDropdown';
 import CurrencySelector from '../components/CurrencySelector';
@@ -249,8 +248,7 @@ export default function RESPFlow() {
 
   if (submitted && account) {
     return (
-      <div className="min-h-screen flex flex-col bg-qt-white">
-        <TopNav />
+      <div className="flex flex-col min-h-0">
         <div className="flex-1 flex items-center justify-center">
           <div className="max-w-md text-center px-6">
             <div className="size-16 rounded-full bg-qt-green-bg flex items-center justify-center mx-auto mb-6">
@@ -275,8 +273,7 @@ export default function RESPFlow() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-qt-white">
-      <TopNav showExit onExit={() => navigate('/')} />
+    <div className="flex flex-col min-h-0">
       {showSummary && account && renderSummary()}
       <main className="flex-1">
         <div className="max-w-[680px] mx-auto w-full px-6 py-10">
@@ -1388,6 +1385,11 @@ export default function RESPFlow() {
                 <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
                 <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
               </div>
+              {((currency === 'CAD' && parsedAmount > 50000) || (currency === 'USD' && parsedAmount > 25000)) && (
+                <div className="px-5 py-3 bg-amber-50 border-t border-amber-300">
+                  <p className="text-sm text-amber-800">This amount is more than $50k CAD or $25k USD, so it will be processed in multiple withdrawals.</p>
+                </div>
+              )}
             </div>
 
             <div className="mb-6">
@@ -1429,6 +1431,7 @@ function RESPBalanceCard({ account }: { account: Account }) {
   const usdLabel = combined ? 'Combined USD' : 'USD';
 
   return (
+    <>
     <div className="border border-qt-border rounded-lg overflow-hidden shadow-sm">
       <div className="flex items-center justify-between px-5 py-3 bg-qt-bg-3 border-b border-qt-border">
         <p className="font-semibold text-sm text-qt-primary">Available to Withdraw</p>
@@ -1459,14 +1462,21 @@ function RESPBalanceCard({ account }: { account: Account }) {
       <div className="border-t border-qt-border">
         <BreakdownRow label="Grant Amount" cad={grantsCad} usd={grantsUsd} />
       </div>
+      <div className="border-t border-qt-border">
+        <BreakdownRow label="Unsettled cash" cad={combined ? 150 + 50 * FX_RATE : 150} usd={combined ? 150 / FX_RATE + 50 : 50} />
+      </div>
     </div>
+    <p className="text-xs text-qt-secondary mt-2 leading-relaxed">
+      You can only withdraw fully settled funds. Any funds from recent trades will be available for withdrawal upon settlement (typically 1 business day).
+    </p>
+    </>
   );
 }
 
 function BreakdownRow({ label, cad, usd, bold }: { label: string; cad: number; usd: number; bold?: boolean }) {
   return (
     <div className="grid grid-cols-3 px-5 py-3 items-center">
-      <p className={`text-sm ${bold ? 'font-semibold text-qt-primary' : 'text-qt-secondary pl-4'}`}>{label}</p>
+      <p className={`text-sm ${bold ? 'font-semibold text-qt-primary' : 'text-qt-secondary'}`}>{label}</p>
       <p className={`text-sm text-center ${bold ? 'font-semibold text-qt-primary' : 'text-qt-primary'}`}>
         {formatCurrency(cad, 'CAD')}
       </p>
