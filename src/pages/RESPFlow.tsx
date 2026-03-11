@@ -1463,7 +1463,7 @@ function RESPBalanceCard({ account }: { account: Account }) {
         <BreakdownRow label="Grant Amount" cad={grantsCad} usd={grantsUsd} />
       </div>
       <div className="border-t border-qt-border">
-        <BreakdownRow label="Unsettled cash" cad={combined ? 150 + 50 * FX_RATE : 150} usd={combined ? 150 / FX_RATE + 50 : 50} />
+        <BreakdownRow label="Pending settlement" cad={combined ? 150 + 50 * FX_RATE : 150} usd={combined ? 150 / FX_RATE + 50 : 50} />
       </div>
     </div>
     <p className="text-xs text-qt-secondary mt-2 leading-relaxed">

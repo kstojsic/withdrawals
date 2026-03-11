@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Account } from '../types';
 import { formatCurrency, FX_RATE } from '../data/accounts';
-import Tooltip from './Tooltip';
 
 interface BalanceCardProps {
   account: Account;
@@ -9,8 +8,7 @@ interface BalanceCardProps {
 
 export default function BalanceCard({ account }: BalanceCardProps) {
   const [combined, setCombined] = useState(true);
-  const isMargin = account.type === 'MARGIN' && account.marginBreakdown;
-
+  const isMargin = account.type === 'MARGIN';
   const cadBalance = account.balance.cad;
   const usdBalance = account.balance.usd;
 
@@ -39,27 +37,15 @@ export default function BalanceCard({ account }: BalanceCardProps) {
         </button>
       </div>
 
-      {!isMargin ? (
-        <div>
-          <div className="grid grid-cols-3 px-5 py-2 bg-qt-bg-2 border-b border-qt-border">
-            <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary">&nbsp;</p>
-            <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary text-center">{cadLabel}</p>
-            <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary text-center">{usdLabel}</p>
+      {isMargin ? (
+        <div className="grid grid-cols-2 divide-x divide-qt-border">
+          <div className="p-5 text-center">
+            <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary mb-1">{cadLabel}</p>
+            <p className="text-xl font-semibold text-qt-primary">{formatCurrency(displayCad, 'CAD')}</p>
           </div>
-          <MarginRow
-            label="Available cash"
-            cad={displayCad}
-            usd={displayUsd}
-            bold
-            combined={combined}
-          />
-          <div className="border-t border-qt-border">
-            <MarginRow
-              label="Unsettled cash"
-              cad={combined ? 150 + 50 * FX_RATE : 150}
-              usd={combined ? 150 / FX_RATE + 50 : 50}
-              combined={combined}
-            />
+          <div className="p-5 text-center">
+            <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary mb-1">{usdLabel}</p>
+            <p className="text-xl font-semibold text-qt-primary">{formatCurrency(displayUsd, 'USD')}</p>
           </div>
         </div>
       ) : (
@@ -70,7 +56,7 @@ export default function BalanceCard({ account }: BalanceCardProps) {
             <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary text-center">{usdLabel}</p>
           </div>
           <MarginRow
-            label="Total available to withdraw"
+            label="Available to withdraw"
             cad={displayCad}
             usd={displayUsd}
             bold
@@ -78,28 +64,7 @@ export default function BalanceCard({ account }: BalanceCardProps) {
           />
           <div className="border-t border-qt-border">
             <MarginRow
-              label="Settled Cash"
-              cad={combined ? account.marginBreakdown!.settledCash.cad + account.marginBreakdown!.settledCash.usd * FX_RATE : account.marginBreakdown!.settledCash.cad}
-              usd={combined ? account.marginBreakdown!.settledCash.cad / FX_RATE + account.marginBreakdown!.settledCash.usd : account.marginBreakdown!.settledCash.usd}
-              combined={combined}
-            />
-          </div>
-          <div className="border-t border-qt-border">
-            <MarginRow
-              label={
-                <span className="inline-flex items-center gap-1.5">
-                  Margin
-                  <Tooltip content="If you withdraw from your Margin, you will be charged interest" />
-                </span>
-              }
-              cad={combined ? account.marginBreakdown!.buyingPower.cad + account.marginBreakdown!.buyingPower.usd * FX_RATE : account.marginBreakdown!.buyingPower.cad}
-              usd={combined ? account.marginBreakdown!.buyingPower.cad / FX_RATE + account.marginBreakdown!.buyingPower.usd : account.marginBreakdown!.buyingPower.usd}
-              combined={combined}
-            />
-          </div>
-          <div className="border-t border-qt-border">
-            <MarginRow
-              label="Unsettled cash"
+              label="Pending settlement"
               cad={combined ? 150 + 50 * FX_RATE : 150}
               usd={combined ? 150 / FX_RATE + 50 : 50}
               combined={combined}
@@ -108,9 +73,11 @@ export default function BalanceCard({ account }: BalanceCardProps) {
         </div>
       )}
     </div>
-    <p className="text-xs text-qt-secondary mt-2 leading-relaxed">
-      You can only withdraw fully settled funds. Any funds from recent trades will be available for withdrawal upon settlement (typically 1 business day).
-    </p>
+    {!isMargin && (
+      <p className="text-xs text-qt-secondary mt-2 leading-relaxed">
+        You can only withdraw fully settled funds. Any funds from recent trades will be available for withdrawal upon settlement (typically 1 business day).
+      </p>
+    )}
     </div>
   );
 }
