@@ -14,7 +14,7 @@ import InputField from '../components/InputField';
 import Button from '../components/Button';
 import InfoBox from '../components/InfoBox';
 import WizardSection from '../components/WizardSection';
-import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE } from '../data/accounts';
+import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, RESPWithdrawalType } from '../types';
 
 const respOptions: { value: RESPWithdrawalType; label: string }[] = [
@@ -41,7 +41,11 @@ export default function RESPFlow() {
     swiftCode: '', bankAccountNumber: '',
     hasIntermediary: false, intermediaryBankName: '',
     intermediarySwiftCode: '', intermediaryAccountNumber: '',
-    otherBrokerageAccount: '',
+    routingNumber: '',
+    isBrokerage: false,
+    brokerageName: '',
+    brokerageAccountName: '',
+    brokerageAccountNumber: '',
   });
   const [signed, setSigned] = useState(false);
   const [jointSigned, setJointSigned] = useState(false);
@@ -155,22 +159,22 @@ export default function RESPFlow() {
 
   const totalCad = contribCad + growthCad + grantsCad;
   const totalUsd = contribUsd + growthUsd + grantsUsd;
-  const combinedTotalCad = totalCad + totalUsd * FX_RATE;
-  const combinedTotalUsd = totalCad / FX_RATE + totalUsd;
+  const combinedTotalCad = totalCad + totalUsd * FX_RATE * (1 - FX_BUFFER);
+  const combinedTotalUsd = totalCad / FX_RATE * (1 - FX_BUFFER) + totalUsd;
 
   const maxAmount = currency === 'CAD' ? combinedTotalCad : currency === 'USD' ? combinedTotalUsd : 0;
   const parsedAmount = parseFloat(amount) || 0;
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
   const singleCurrencyBalance = currency === 'CAD' ? totalCad : currency === 'USD' ? totalUsd : 0;
   const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
-  const fee = method === 'wire' ? 20 : method === 'international_wire' ? 40 : 0;
+  const fee = method === 'wire' ? (currency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
 
   const isEAPPSE = respType === 'eap_pse';
   const isCapital = respType === 'capital';
   const isAIP = respType === 'aip';
 
-  const combinedGrowthCad = growthCad + growthUsd * FX_RATE;
-  const combinedGrowthUsd = growthCad / FX_RATE + growthUsd;
+  const combinedGrowthCad = growthCad + growthUsd * FX_RATE * (1 - FX_BUFFER);
+  const combinedGrowthUsd = growthCad / FX_RATE * (1 - FX_BUFFER) + growthUsd;
   const aipMaxAmount = currency === 'CAD' ? combinedGrowthCad : currency === 'USD' ? combinedGrowthUsd : 0;
   const singleGrowthBalance = currency === 'CAD' ? growthCad : currency === 'USD' ? growthUsd : 0;
   const aipTriggersConversion = parsedAmount > singleGrowthBalance && parsedAmount <= aipMaxAmount && parsedAmount > 0;
@@ -191,8 +195,8 @@ export default function RESPFlow() {
   const priorTransferAmt = aipPriorTransfers === 'yes' ? (parseFloat(aipPriorTransferAmount) || 0) : 0;
   const lifetimeExceeded = rolloverAmount + priorTransferAmt > 50000;
 
-  const combinedContribCad = contribCad + contribUsd * FX_RATE;
-  const combinedContribUsd = contribCad / FX_RATE + contribUsd;
+  const combinedContribCad = contribCad + contribUsd * FX_RATE * (1 - FX_BUFFER);
+  const combinedContribUsd = contribCad / FX_RATE * (1 - FX_BUFFER) + contribUsd;
   const capMaxAmount = currency === 'CAD' ? combinedContribCad : currency === 'USD' ? combinedContribUsd : 0;
   const capParsedAmount = parseFloat(capAmount) || 0;
   const capExceedsAvailable = capParsedAmount > capMaxAmount && capParsedAmount > 0;
@@ -385,7 +389,7 @@ export default function RESPFlow() {
             {/* Method */}
             <WizardSection visible={isEAPPSE && amountReady}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} />
+                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
               </section>
             </WizardSection>
 
@@ -692,7 +696,7 @@ export default function RESPFlow() {
             {/* Capital Method */}
             <WizardSection visible={isCapital && parsedAmount > 0 && !exceedsAvailable}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} />
+                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
               </section>
             </WizardSection>
 
@@ -937,7 +941,7 @@ export default function RESPFlow() {
 
             <WizardSection visible={isAIP && parsedAmount > 0 && parsedAmount <= aipMaxAmount}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} />
+                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
               </section>
             </WizardSection>
 
@@ -1281,8 +1285,9 @@ export default function RESPFlow() {
     if (!account) return null;
     const bank = allBanks.find((b) => b.id === selectedBank);
     const summaryAmount = isCapital ? capParsedAmount : parsedAmount;
-    const aipTax = isAIP && aipChoice === 'withdrawal' ? t1172_tax : 0;
-    const net = summaryAmount - fee - aipTax;
+    const aipTaxCad = isAIP && aipChoice === 'withdrawal' ? t1172_tax : 0;
+    const aipTaxInCurrency = currency === 'USD' ? aipTaxCad / FX_RATE : aipTaxCad;
+    const net = summaryAmount - fee - aipTaxInCurrency;
     const typeLabel = isAIP
       ? `Accumulated Income Payment (AIP) — ${aipChoice === 'rollover' ? 'Rollover' : 'Withdrawal'}`
       : isCapital ? 'Capital Withdrawal'
@@ -1347,10 +1352,10 @@ export default function RESPFlow() {
               {isAIP && aipChoice === 'withdrawal' && (
                 <>
                   <SummaryRow label="Province" value={aipProvince} />
-                  <SummaryRow label="Total AIP" value={formatCurrency(t1172_line1, 'CAD')} />
-                  <SummaryRow label="RRSP deduction" value={formatCurrency(t1172_line6, 'CAD')} />
-                  <SummaryRow label="AIP subject to tax" value={formatCurrency(t1172_line7, 'CAD')} />
-                  <SummaryRow label={`Additional tax (${(t1172_rate * 100).toFixed(0)}%)`} value={`-${formatCurrency(t1172_tax, 'CAD')}`} tooltip="This additional tax is reported on line 41800 of your income tax return" />
+                  <SummaryRow label="Total AIP" value={formatCurrency(currency === 'USD' ? t1172_line1 / FX_RATE : t1172_line1, currency || 'CAD')} />
+                  <SummaryRow label="RRSP deduction" value={formatCurrency(currency === 'USD' ? t1172_line6 / FX_RATE : t1172_line6, currency || 'CAD')} />
+                  <SummaryRow label="AIP subject to tax" value={formatCurrency(currency === 'USD' ? t1172_line7 / FX_RATE : t1172_line7, currency || 'CAD')} />
+                  <SummaryRow label={`Additional tax (${(t1172_rate * 100).toFixed(0)}%)`} value={`-${formatCurrency(aipTaxInCurrency, currency || 'CAD')}`} tooltip="This additional tax is reported on line 41800 of your income tax return" />
                 </>
               )}
               {isAIP && aipChoice === 'rollover' && (
@@ -1383,9 +1388,14 @@ export default function RESPFlow() {
 
               <div className="flex items-center justify-between px-5 py-4 bg-qt-bg-3">
                 <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
-                <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
+                <p className={`font-semibold text-lg ${net <= 0 ? 'text-qt-red' : 'text-qt-green-dark'}`}>{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
               </div>
-              {((currency === 'CAD' && parsedAmount > 50000) || (currency === 'USD' && parsedAmount > 25000)) && (
+              {net <= 0 && (
+                <div className="px-5 py-3 bg-red-50 border-t border-red-300">
+                  <p className="text-sm text-red-800">The withholding tax and fees exceed your withdrawal amount. Please go back and reduce the tax inputs or increase your withdrawal amount.</p>
+                </div>
+              )}
+              {net > 0 && ((currency === 'CAD' && parsedAmount > 50000) || (currency === 'USD' && parsedAmount > 25000)) && (
                 <div className="px-5 py-3 bg-amber-50 border-t border-amber-300">
                   <p className="text-sm text-amber-800">This amount is more than $50k CAD or $25k USD, so it will be processed in multiple withdrawals.</p>
                 </div>
@@ -1402,7 +1412,7 @@ export default function RESPFlow() {
 
             <div className="flex gap-3">
               <Button variant="secondary" onClick={() => setShowSummary(false)}>Back</Button>
-              <Button onClick={handleSubmit}>Submit withdrawal</Button>
+              <Button onClick={handleSubmit} disabled={net <= 0}>Submit withdrawal</Button>
             </div>
           </div>
         </div>
@@ -1414,15 +1424,15 @@ export default function RESPFlow() {
 /* ---------- RESP Balance Card ---------- */
 
 function RESPBalanceCard({ account }: { account: Account }) {
-  const [combined, setCombined] = useState(true);
+  const [combined, setCombined] = useState(false);
   const bd = account.respBreakdown!;
 
-  const contribCad = combined ? bd.contributions.cad + bd.contributions.usd * FX_RATE : bd.contributions.cad;
-  const contribUsd = combined ? bd.contributions.cad / FX_RATE + bd.contributions.usd : bd.contributions.usd;
-  const growthCad = combined ? bd.investmentGrowth.cad + bd.investmentGrowth.usd * FX_RATE : bd.investmentGrowth.cad;
-  const growthUsd = combined ? bd.investmentGrowth.cad / FX_RATE + bd.investmentGrowth.usd : bd.investmentGrowth.usd;
-  const grantsCad = combined ? bd.grants.cad + bd.grants.usd * FX_RATE : bd.grants.cad;
-  const grantsUsd = combined ? bd.grants.cad / FX_RATE + bd.grants.usd : bd.grants.usd;
+  const contribCad = combined ? bd.contributions.cad + bd.contributions.usd * FX_RATE * (1 - FX_BUFFER) : bd.contributions.cad;
+  const contribUsd = combined ? bd.contributions.cad / FX_RATE * (1 - FX_BUFFER) + bd.contributions.usd : bd.contributions.usd;
+  const growthCad = combined ? bd.investmentGrowth.cad + bd.investmentGrowth.usd * FX_RATE * (1 - FX_BUFFER) : bd.investmentGrowth.cad;
+  const growthUsd = combined ? bd.investmentGrowth.cad / FX_RATE * (1 - FX_BUFFER) + bd.investmentGrowth.usd : bd.investmentGrowth.usd;
+  const grantsCad = combined ? bd.grants.cad + bd.grants.usd * FX_RATE * (1 - FX_BUFFER) : bd.grants.cad;
+  const grantsUsd = combined ? bd.grants.cad / FX_RATE * (1 - FX_BUFFER) + bd.grants.usd : bd.grants.usd;
 
   const totalCad = contribCad + growthCad + grantsCad;
   const totalUsd = contribUsd + growthUsd + grantsUsd;
@@ -1463,7 +1473,7 @@ function RESPBalanceCard({ account }: { account: Account }) {
         <BreakdownRow label="Grant Amount" cad={grantsCad} usd={grantsUsd} />
       </div>
       <div className="border-t border-qt-border">
-        <BreakdownRow label="Pending settlement" cad={combined ? 150 + 50 * FX_RATE : 150} usd={combined ? 150 / FX_RATE + 50 : 50} />
+        <BreakdownRow label="Unavailable funds" cad={combined ? 150 + 50 * FX_RATE * (1 - FX_BUFFER) : 150} usd={combined ? 150 / FX_RATE * (1 - FX_BUFFER) + 50 : 50} />
       </div>
     </div>
     <p className="text-xs text-qt-secondary mt-2 leading-relaxed">

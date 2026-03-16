@@ -86,6 +86,13 @@ export default function InternationalWireForm({ currency, amount, onChange, data
               onChange={(e) => update('bankAccountNumber', e.target.value)}
             />
           </div>
+          <InputField
+            label="Routing number (required for U.S. banks)"
+            placeholder="e.g. 021000021"
+            value={data.routingNumber}
+            onChange={(e) => update('routingNumber', e.target.value)}
+            maxLength={9}
+          />
         </div>
       </div>
 
@@ -138,12 +145,50 @@ export default function InternationalWireForm({ currency, amount, onChange, data
       </div>
 
       <div className="border-t border-qt-border pt-6">
-        <InputField
-          label="Other brokerage account information (optional)"
-          placeholder="Enter any additional account information"
-          value={data.otherBrokerageAccount}
-          onChange={(e) => update('otherBrokerageAccount', e.target.value)}
-        />
+        <p className="font-semibold text-base text-qt-primary leading-6 mb-3">Brokerage account information</p>
+        <p className="text-sm text-qt-secondary mb-4">Only applicable if you are wiring funds to another brokerage.</p>
+        <div className="mb-4">
+          <p className="text-sm text-qt-secondary mb-3">Are you wiring to another brokerage?</p>
+          <div className="flex gap-6">
+            <RadioButton
+              name="is-brokerage"
+              value="yes"
+              label="Yes"
+              checked={data.isBrokerage}
+              onChange={() => update('isBrokerage', true)}
+            />
+            <RadioButton
+              name="is-brokerage"
+              value="no"
+              label="No"
+              checked={!data.isBrokerage}
+              onChange={() => update('isBrokerage', false)}
+            />
+          </div>
+        </div>
+
+        {data.isBrokerage && (
+          <div className="flex flex-col gap-4 animate-[fadeSlideIn_0.3s_ease-out]">
+            <InputField
+              label="Brokerage name"
+              placeholder="e.g. Fidelity, Charles Schwab"
+              value={data.brokerageName}
+              onChange={(e) => update('brokerageName', e.target.value)}
+            />
+            <InputField
+              label="Name on brokerage account"
+              placeholder="Enter the account holder's name"
+              value={data.brokerageAccountName}
+              onChange={(e) => update('brokerageAccountName', e.target.value)}
+            />
+            <InputField
+              label="Brokerage account number"
+              placeholder="Enter account number"
+              value={data.brokerageAccountNumber}
+              onChange={(e) => update('brokerageAccountNumber', e.target.value)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

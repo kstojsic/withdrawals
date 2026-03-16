@@ -1,6 +1,7 @@
 import type { Account, LinkedBank } from '../types';
 
 export const FX_RATE = 1.36;
+export const FX_BUFFER = 0.0225;
 
 export const accounts: Account[] = [
   {
@@ -122,6 +123,20 @@ export function getWithholdingRate(grossAmount: number): number {
   if (grossAmount <= 5000) return 10;
   if (grossAmount <= 15000) return 20;
   return 30;
+}
+
+export function grossFromNet(netAmount: number): number {
+  if (netAmount <= 0) return 0;
+  const brackets: { maxGross: number; rate: number }[] = [
+    { maxGross: 5000, rate: 0.10 },
+    { maxGross: 15000, rate: 0.20 },
+    { maxGross: Infinity, rate: 0.30 },
+  ];
+  for (const { maxGross, rate } of brackets) {
+    const gross = netAmount / (1 - rate);
+    if (gross <= maxGross) return gross;
+  }
+  return netAmount / 0.70;
 }
 
 export function formatAmountDisplay(value: string): string {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Building2, ChevronRight } from 'lucide-react';
+import { X, Building2, ChevronRight, Upload, CheckCircle2 } from 'lucide-react';
 import type { LinkedBank } from '../types';
 import { bankOptions } from '../data/accounts';
 import InputField from './InputField';
@@ -15,6 +15,7 @@ export default function LinkBankModal({ onClose, onSave }: LinkBankModalProps) {
   const [selectedBank, setSelectedBank] = useState('');
   const [transit, setTransit] = useState('');
   const [accountNum, setAccountNum] = useState('');
+  const [voidCheque, setVoidCheque] = useState<File | null>(null);
 
   function handleSave() {
     const bankInfo = bankOptions.find((b) => b.value === selectedBank);
@@ -122,11 +123,47 @@ export default function LinkBankModal({ onClose, onSave }: LinkBankModalProps) {
                 value={accountNum}
                 onChange={(e) => setAccountNum(e.target.value)}
               />
+
+              <div>
+                <label className="text-sm leading-[22px] text-qt-primary mb-1 block">
+                  Upload void cheque or direct deposit form
+                </label>
+                <div
+                  className="border-2 border-dashed border-qt-border rounded-lg p-6 text-center hover:border-qt-green transition-colors cursor-pointer"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files?.[0]) setVoidCheque(e.dataTransfer.files[0]); }}
+                  onClick={() => document.getElementById('void-cheque-upload')?.click()}
+                >
+                  <input
+                    id="void-cheque-upload"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) setVoidCheque(e.target.files[0]); }}
+                  />
+                  {voidCheque ? (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <CheckCircle2 size={22} className="text-qt-green" />
+                      <p className="text-sm font-semibold text-qt-primary">{voidCheque.name}</p>
+                      <p className="text-xs text-qt-secondary">Click or drag to replace</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <Upload size={22} className="text-qt-secondary" />
+                      <p className="text-sm text-qt-primary">
+                        Drag & drop your file here, or <span className="font-semibold text-qt-green-dark">browse</span>
+                      </p>
+                      <p className="text-xs text-qt-secondary">Accepted formats: PDF, JPG, PNG</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <Button variant="secondary" onClick={() => setMode('choose')}>Back</Button>
                 <Button
                   onClick={handleSave}
-                  disabled={!selectedBank || !transit || !accountNum}
+                  disabled={!selectedBank || !transit || !accountNum || !voidCheque}
                 >
                   Link account
                 </Button>

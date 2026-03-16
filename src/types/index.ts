@@ -72,5 +72,9 @@ export interface InternationalWireData {
   intermediaryBankName: string;
   intermediarySwiftCode: string;
   intermediaryAccountNumber: string;
-  otherBrokerageAccount: string;
+  routingNumber: string;
+  isBrokerage: boolean;
+  brokerageName: string;
+  brokerageAccountName: string;
+  brokerageAccountNumber: string;
 }

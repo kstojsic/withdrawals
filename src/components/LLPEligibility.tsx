@@ -4,7 +4,8 @@ import InputField from './InputField';
 import CurrencyInput from './CurrencyInput';
 import InfoBox from './InfoBox';
 import QuestionGroup from './QuestionGroup';
-import { formatCurrency } from '../data/accounts';
+import type { Currency } from '../types';
+import { formatCurrency, FX_RATE } from '../data/accounts';
 
 type YesNo = 'yes' | 'no' | null;
 
@@ -50,9 +51,10 @@ interface LLPEligibilityProps {
   onComplete: (eligible: boolean, data: LLPState) => void;
   withdrawalAmount: string;
   onWithdrawalAmountChange: (val: string) => void;
+  currency?: Currency | null;
 }
 
-export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange }: LLPEligibilityProps) {
+export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange, currency }: LLPEligibilityProps) {
   const [s, setS] = useState<LLPState>({ ...initialState, withdrawalAmount });
 
   useEffect(() => {
@@ -121,8 +123,11 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
   const lineB = parseFloat(s.alreadyWithdrawnThisYear) || 0;
   const lineC = parseFloat(s.previousYearsWithdrawn) || 0;
 
-  const yearlyExceeds = lineA + lineB > 10000;
-  const totalExceeds = lineA + lineB + lineC > 20000;
+  const cur = currency || 'CAD';
+  const yearlyLimit = cur === 'USD' ? 10000 / FX_RATE : 10000;
+  const lifetimeLimit = cur === 'USD' ? 20000 / FX_RATE : 20000;
+  const yearlyExceeds = lineA + lineB > yearlyLimit;
+  const totalExceeds = lineA + lineB + lineC > lifetimeLimit;
 
   const isTerminal_notEnrolled = s.enrolled === 'no';
   const isTerminal_noDisability = s.enrollmentType === 'part-time' && s.disabilityCondition === 'no';
@@ -307,7 +312,7 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
                   <div className="mt-3">
                     <InfoBox variant="warning">
                       <p>
-                        Your total withdrawals this year (Line A + Line B = {formatCurrency(lineA + lineB, 'CAD')}) exceed the $10,000 annual limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds the $10,000 limit.
+                        Your total withdrawals this year (Line A + Line B = {formatCurrency(lineA + lineB, cur)}) exceed the {formatCurrency(yearlyLimit, cur)} annual limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds this limit.
                       </p>
                     </InfoBox>
                   </div>
@@ -326,13 +331,13 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
                   onChange={(v) => set('previousYearsWithdrawn', v)}
                 />
                 <p className="text-xs text-qt-secondary mt-1">
-                  Do not include amounts that were included as income in your previous years' income tax and benefit returns because you exceeded the $10,000 limit.
+                  Do not include amounts that were included as income in your previous years' income tax and benefit returns because you exceeded the {formatCurrency(yearlyLimit, cur)} limit.
                 </p>
                 {totalExceeds && (
                   <div className="mt-3">
                     <InfoBox variant="warning">
                       <p>
-                        Your total LLP withdrawals (Line A + Line B + Line C = {formatCurrency(lineA + lineB + lineC, 'CAD')}) exceed the $20,000 lifetime limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds the $20,000 limit.
+                        Your total LLP withdrawals (Line A + Line B + Line C = {formatCurrency(lineA + lineB + lineC, cur)}) exceed the {formatCurrency(lifetimeLimit, cur)} lifetime limit. Your RRSP issuer will withhold tax on the part of your withdrawal that exceeds this limit.
                       </p>
                     </InfoBox>
                   </div>

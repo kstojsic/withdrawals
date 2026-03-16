@@ -1,19 +1,19 @@
 import { useState, type ReactNode } from 'react';
 import type { Account } from '../types';
-import { formatCurrency, FX_RATE } from '../data/accounts';
+import { formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
 
 interface BalanceCardProps {
   account: Account;
 }
 
 export default function BalanceCard({ account }: BalanceCardProps) {
-  const [combined, setCombined] = useState(true);
+  const [combined, setCombined] = useState(false);
   const isMargin = account.type === 'MARGIN';
   const cadBalance = account.balance.cad;
   const usdBalance = account.balance.usd;
 
-  const combinedCad = cadBalance + usdBalance * FX_RATE;
-  const combinedUsd = cadBalance / FX_RATE + usdBalance;
+  const combinedCad = cadBalance + usdBalance * FX_RATE * (1 - FX_BUFFER);
+  const combinedUsd = cadBalance / FX_RATE * (1 - FX_BUFFER) + usdBalance;
 
   const displayCad = combined ? combinedCad : cadBalance;
   const displayUsd = combined ? combinedUsd : usdBalance;
@@ -64,9 +64,9 @@ export default function BalanceCard({ account }: BalanceCardProps) {
           />
           <div className="border-t border-qt-border">
             <MarginRow
-              label="Pending settlement"
-              cad={combined ? 150 + 50 * FX_RATE : 150}
-              usd={combined ? 150 / FX_RATE + 50 : 50}
+              label="Unavailable funds"
+              cad={combined ? 150 + 50 * FX_RATE * (1 - FX_BUFFER) : 150}
+              usd={combined ? 150 / FX_RATE * (1 - FX_BUFFER) + 50 : 50}
               combined={combined}
             />
           </div>

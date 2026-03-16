@@ -16,7 +16,7 @@ import Button from '../components/Button';
 import InfoBox from '../components/InfoBox';
 import RadioButton from '../components/RadioButton';
 import WizardSection from '../components/WizardSection';
-import { accounts, linkedBanks as defaultBanks, formatCurrency, formatAmountDisplay, stripFormatting, FX_RATE } from '../data/accounts';
+import { accounts, linkedBanks as defaultBanks, formatCurrency, formatAmountDisplay, stripFormatting, FX_RATE, FX_BUFFER } from '../data/accounts';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, FHSAWithdrawalType } from '../types';
 
 const fhsaOptions: { value: FHSAWithdrawalType; label: string; badge?: string }[] = [
@@ -44,11 +44,13 @@ export default function FHSAFlow() {
     swiftCode: '', bankAccountNumber: '',
     hasIntermediary: false, intermediaryBankName: '',
     intermediarySwiftCode: '', intermediaryAccountNumber: '',
-    otherBrokerageAccount: '',
+    routingNumber: '',
+    isBrokerage: false,
+    brokerageName: '',
+    brokerageAccountName: '',
+    brokerageAccountNumber: '',
   });
   const [signed, setSigned] = useState(false);
-  const [qualifyingFormChoice, setQualifyingFormChoice] = useState<'upload' | 'fillhere' | null>(null);
-  const [qualifyingUploadedFile, setQualifyingUploadedFile] = useState<File | null>(null);
   const [qualifyingEligible, setQualifyingEligible] = useState(false);
   const [qualifyingData, setQualifyingData] = useState<Record<string, unknown>>({});
   const [confirmChecked, setConfirmChecked] = useState(false);
@@ -56,8 +58,6 @@ export default function FHSAFlow() {
   const [submitted, setSubmitted] = useState(false);
 
   // Overcontribution (RC727) state
-  const [ovpFormChoice, setOvpFormChoice] = useState<'upload' | 'fillhere' | null>(null);
-  const [ovpUploadedFile, setOvpUploadedFile] = useState<File | null>(null);
   const [ovpExcessAmount, setOvpExcessAmount] = useState('');
   const [ovpSource, setOvpSource] = useState<'cash' | 'rrsp' | 'both' | null>(null);
   const [ovpRemovalMethod, setOvpRemovalMethod] = useState<'withdrawal' | 'transfer' | null>(null);
@@ -85,14 +85,10 @@ export default function FHSAFlow() {
     setMethod(null);
     setSelectedBank(null);
     setSigned(false);
-    setQualifyingFormChoice(null);
-    setQualifyingUploadedFile(null);
     setQualifyingEligible(false);
     setQualifyingData({});
     setConfirmChecked(false);
     setShowSummary(false);
-    setOvpFormChoice(null);
-    setOvpUploadedFile(null);
     setOvpExcessAmount('');
     setOvpSource(null);
     setOvpRemovalMethod(null);
@@ -104,14 +100,14 @@ export default function FHSAFlow() {
 
   const cadAvailable = account ? account.balance.cad : 0;
   const usdAvailable = account ? account.balance.usd : 0;
-  const combinedCad = cadAvailable + usdAvailable * FX_RATE;
-  const combinedUsd = cadAvailable / FX_RATE + usdAvailable;
+  const combinedCad = cadAvailable + usdAvailable * FX_RATE * (1 - FX_BUFFER);
+  const combinedUsd = cadAvailable / FX_RATE * (1 - FX_BUFFER) + usdAvailable;
   const maxAmount = currency === 'CAD' ? combinedCad : currency === 'USD' ? combinedUsd : 0;
   const parsedAmount = parseFloat(amount) || 0;
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
   const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
   const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
-  const fee = method === 'wire' ? 20 : method === 'international_wire' ? 40 : 0;
+  const fee = method === 'wire' ? (currency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
 
   const isQualifying = fhsaType === 'qualifying';
   const isNonQualifying = fhsaType === 'non_qualifying';
@@ -121,15 +117,9 @@ export default function FHSAFlow() {
     ? intlWire.bankName && intlWire.swiftCode
     : selectedBank;
 
-  const canContinueQualifyingUpload =
+  const canContinueQualifying =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady
-    && qualifyingFormChoice === 'upload' && qualifyingUploadedFile && confirmChecked;
-
-  const canContinueQualifyingFill =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady
-    && qualifyingFormChoice === 'fillhere' && qualifyingEligible && confirmChecked;
-
-  const canContinueQualifying = canContinueQualifyingUpload || canContinueQualifyingFill;
+    && qualifyingEligible && confirmChecked;
 
   const canContinueNonQualifying =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
@@ -150,10 +140,8 @@ export default function FHSAFlow() {
   const ovpTransferReady = ovpRemovalMethod === 'transfer' ? !!ovpTransferAccount : true;
 
   const canContinueOvercontribution =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && (
-      (ovpFormChoice === 'fillhere' && ovpExcessAmount && ovpSource && ovpRemovalMethod && ovpTransferReady && ovpTaxUnderstood && ovpAgreed && ovpSigned)
-      || (ovpFormChoice === 'upload' && ovpUploadedFile && confirmChecked)
-    );
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady &&
+    ovpExcessAmount && ovpSource && ovpRemovalMethod && ovpTransferReady && ovpTaxUnderstood && ovpAgreed && ovpSigned;
 
   function handleSubmit() {
     setSubmitted(true);
@@ -222,13 +210,9 @@ export default function FHSAFlow() {
                     setMethod(null);
                     setSelectedBank(null);
                     setSigned(false);
-                    setQualifyingFormChoice(null);
-                    setQualifyingUploadedFile(null);
                     setQualifyingEligible(false);
                     setQualifyingData({});
                     setConfirmChecked(false);
-                    setOvpFormChoice(null);
-                    setOvpUploadedFile(null);
                     setOvpExcessAmount('');
                     setOvpSource(null);
                     setOvpRemovalMethod(null);
@@ -303,7 +287,7 @@ export default function FHSAFlow() {
             {/* Method */}
             <WizardSection visible={parsedAmount > 0 && !exceedsAvailable}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} />
+                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
               </section>
             </WizardSection>
 
@@ -334,105 +318,15 @@ export default function FHSAFlow() {
               </section>
             </WizardSection>
 
-            {/* Qualifying: Form choice */}
+            {/* Qualifying Eligibility */}
             <WizardSection visible={isQualifying && !!bankReady}>
-              <section className="flex flex-col gap-4">
+              <section className="flex flex-col gap-5">
                 <div>
                   <p className="font-semibold text-sm text-qt-primary mb-1">RC725 — Qualifying withdrawal form</p>
                   <p className="text-sm text-qt-secondary leading-relaxed">
-                    To meet government requirements, we need a completed RC725 form to process your request. Tell us how you'd like to complete your withdrawal form.
+                    The CRA requires a completed RC725 form to process a qualifying FHSA withdrawal. We've simplified this by turning the form into a short questionnaire — once you're done, we'll generate a pre-filled RC725 that you can download from the summary page.
                   </p>
                 </div>
-
-                {/* Option 1: Fill here */}
-                <button
-                  type="button"
-                  onClick={() => { setQualifyingFormChoice('fillhere'); setQualifyingUploadedFile(null); }}
-                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${
-                    qualifyingFormChoice === 'fillhere'
-                      ? 'border-qt-green bg-qt-green-bg/30'
-                      : 'border-qt-border hover:border-qt-gray-dark bg-white'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">
-                      Recommended
-                    </span>
-                  </div>
-                  <p className="text-sm text-qt-secondary leading-relaxed">
-                    Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.
-                  </p>
-                </button>
-
-                {/* Option 2: Upload */}
-                <button
-                  type="button"
-                  onClick={() => { setQualifyingFormChoice('upload'); setQualifyingEligible(false); setQualifyingData({}); }}
-                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${
-                    qualifyingFormChoice === 'upload'
-                      ? 'border-qt-green bg-qt-green-bg/30'
-                      : 'border-qt-border hover:border-qt-gray-dark bg-white'
-                  }`}
-                >
-                  <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
-                  <p className="text-sm text-qt-secondary leading-relaxed">
-                    Download, sign, and upload your document manually.
-                  </p>
-                  <a
-                    href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/rc725.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2"
-                  >
-                    Download RC725 from Canada.ca &rarr;
-                  </a>
-                </button>
-              </section>
-            </WizardSection>
-
-            {/* Qualifying: Upload form */}
-            <WizardSection visible={isQualifying && qualifyingFormChoice === 'upload'}>
-              <section className="flex flex-col gap-4">
-                <p className="font-semibold text-sm text-qt-primary">Upload your completed RC725 form</p>
-                <div
-                  className="border-2 border-dashed border-qt-border rounded-lg p-8 text-center hover:border-qt-gray-dark transition-colors cursor-pointer"
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (e.dataTransfer.files?.[0]) setQualifyingUploadedFile(e.dataTransfer.files[0]);
-                  }}
-                  onClick={() => document.getElementById('rc725-upload')?.click()}
-                >
-                  <input
-                    id="rc725-upload"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    className="hidden"
-                    onChange={(e) => { if (e.target.files?.[0]) setQualifyingUploadedFile(e.target.files[0]); }}
-                  />
-                  {qualifyingUploadedFile ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle2 size={24} className="text-qt-green" />
-                      <p className="text-sm font-semibold text-qt-primary">{qualifyingUploadedFile.name}</p>
-                      <p className="text-xs text-qt-secondary">Click or drag to replace</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Download size={24} className="text-qt-secondary rotate-180" />
-                      <p className="text-sm text-qt-primary">Drag & drop your file here, or <span className="font-semibold text-qt-green-dark">browse</span></p>
-                      <p className="text-xs text-qt-secondary">Accepted formats: PDF, JPG, PNG</p>
-                    </div>
-                  )}
-                </div>
-              </section>
-            </WizardSection>
-
-            {/* Qualifying Eligibility (fill here option) */}
-            <WizardSection visible={isQualifying && qualifyingFormChoice === 'fillhere'}>
-              <section>
                 <FHSAEligibility
                   onComplete={(elig, data) => { setQualifyingEligible(elig); setQualifyingData(data as unknown as Record<string, unknown>); }}
                   withdrawalAmount={amount}
@@ -442,7 +336,7 @@ export default function FHSAFlow() {
             </WizardSection>
 
             {/* Qualifying confirmation checkbox */}
-            <WizardSection visible={isQualifying && (qualifyingEligible || (qualifyingFormChoice === 'upload' && !!qualifyingUploadedFile))}>
+            <WizardSection visible={isQualifying && qualifyingEligible}>
               <section>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
@@ -478,72 +372,16 @@ export default function FHSAFlow() {
               </div>
             </WizardSection>
 
-            {/* Overcontribution: Form Choice */}
+            {/* Overcontribution: RC727 Questionnaire */}
             <WizardSection visible={isOvercontribution && !!bankReady}>
-              <section className="flex flex-col gap-4">
+              <section className="flex flex-col gap-6">
+
                 <div>
                   <p className="font-semibold text-sm text-qt-primary mb-1">RC727 — Remove excess FHSA contributions</p>
                   <p className="text-sm text-qt-secondary leading-relaxed">
-                    To meet government requirements, we need a completed RC727 form to process your request. Tell us how you'd like to complete your withdrawal form.
+                    The CRA requires a completed RC727 form to process an FHSA overcontribution removal. We've simplified this by turning the form into a short questionnaire — once you're done, we'll generate a pre-filled RC727 that you can download from the summary page.
                   </p>
                 </div>
-                <button type="button" onClick={() => { setOvpFormChoice('fillhere'); setOvpUploadedFile(null); }}
-                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${ovpFormChoice === 'fillhere' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-sm text-qt-primary">Fill it out here</p>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-qt-green text-white leading-none">Recommended</span>
-                  </div>
-                  <p className="text-sm text-qt-secondary leading-relaxed">Answer a few questions and we'll generate the form for you. Estimated time to complete: 2 minutes.</p>
-                </button>
-                <button type="button" onClick={() => { setOvpFormChoice('upload'); }}
-                  className={`w-full rounded-lg border-2 p-5 text-left transition-all cursor-pointer ${ovpFormChoice === 'upload' ? 'border-qt-green bg-qt-green-bg/30' : 'border-qt-border hover:border-qt-gray-dark bg-white'}`}>
-                  <p className="font-semibold text-sm text-qt-primary mb-1">Upload a completed form</p>
-                  <p className="text-sm text-qt-secondary leading-relaxed">Download, sign, and upload your document manually.</p>
-                  <a href="https://www.canada.ca/en/revenue-agency/services/forms-publications/forms/rc727.html" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 text-sm font-semibold text-qt-green-dark hover:underline mt-2">
-                    Download RC727 from Canada.ca &rarr;
-                  </a>
-                </button>
-              </section>
-            </WizardSection>
-
-            {/* Overcontribution Upload */}
-            <WizardSection visible={isOvercontribution && ovpFormChoice === 'upload'}>
-              <section className="flex flex-col gap-4">
-                <p className="font-semibold text-sm text-qt-primary">Upload your completed RC727 form</p>
-                <div className="border-2 border-dashed border-qt-border rounded-lg p-8 text-center hover:border-qt-gray-dark transition-colors cursor-pointer"
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (e.dataTransfer.files?.[0]) setOvpUploadedFile(e.dataTransfer.files[0]); }}
-                  onClick={() => document.getElementById('ovp-upload')?.click()}>
-                  <input id="ovp-upload" type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
-                    onChange={(e) => { if (e.target.files?.[0]) setOvpUploadedFile(e.target.files[0]); }} />
-                  {ovpUploadedFile ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <CheckCircle2 size={24} className="text-qt-green" />
-                      <p className="text-sm font-semibold text-qt-primary">{ovpUploadedFile.name}</p>
-                      <p className="text-xs text-qt-secondary">Click or drag to replace</p>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Download size={24} className="text-qt-secondary rotate-180" />
-                      <p className="text-sm text-qt-primary">Drag & drop your file here, or <span className="font-semibold text-qt-green-dark">browse</span></p>
-                      <p className="text-xs text-qt-secondary">Accepted formats: PDF, JPG, PNG</p>
-                    </div>
-                  )}
-                </div>
-                {ovpUploadedFile && (
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)}
-                      className="mt-1 size-4 accent-qt-green cursor-pointer" />
-                    <span className="text-sm text-qt-primary leading-[22px]">I confirm that the information I've provided is true and accurate</span>
-                  </label>
-                )}
-              </section>
-            </WizardSection>
-
-            {/* Overcontribution: RC727 Questionnaire (fill here) */}
-            <WizardSection visible={isOvercontribution && ovpFormChoice === 'fillhere' && !!bankReady}>
-              <section className="flex flex-col gap-6">
 
                 {/* Pre-filled profile info */}
                 <div className="bg-qt-bg-3 rounded-lg p-4 flex flex-col gap-2">
@@ -778,22 +616,13 @@ export default function FHSAFlow() {
               )}
             </div>
 
-            {isQualifying && qualifyingFormChoice === 'fillhere' && (
+            {isQualifying && (
               <div className="mb-6">
                 <button className="flex items-center gap-2 text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer">
                   <Download size={16} />
                   Download pre-filled RC725 form
                 </button>
                 <p className="text-xs text-qt-secondary mt-2">A copy will also be emailed to you.</p>
-              </div>
-            )}
-
-            {isQualifying && qualifyingFormChoice === 'upload' && qualifyingUploadedFile && (
-              <div className="bg-qt-bg-3 border border-qt-border rounded-lg p-4 mb-6">
-                <p className="text-sm text-qt-primary">
-                  <CheckCircle2 size={16} className="inline text-qt-green mr-1.5 -mt-0.5" />
-                  RC725 form uploaded: <span className="font-semibold">{qualifyingUploadedFile.name}</span>
-                </p>
               </div>
             )}
 

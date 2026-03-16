@@ -11,7 +11,7 @@ import InternationalWireForm from '../components/InternationalWireForm';
 import ESignature from '../components/ESignature';
 import Button from '../components/Button';
 import WizardSection from '../components/WizardSection';
-import { linkedBanks as defaultBanks, formatCurrency, FX_RATE } from '../data/accounts';
+import { linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData } from '../types';
 
 export default function StandardFlow() {
@@ -30,7 +30,11 @@ export default function StandardFlow() {
     swiftCode: '', bankAccountNumber: '',
     hasIntermediary: false, intermediaryBankName: '',
     intermediarySwiftCode: '', intermediaryAccountNumber: '',
-    otherBrokerageAccount: '',
+    routingNumber: '',
+    isBrokerage: false,
+    brokerageName: '',
+    brokerageAccountName: '',
+    brokerageAccountNumber: '',
   });
   const [signed, setSigned] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -61,14 +65,14 @@ export default function StandardFlow() {
 
   const cadAvailable = account ? account.balance.cad : 0;
   const usdAvailable = account ? account.balance.usd : 0;
-  const combinedCad = cadAvailable + usdAvailable * FX_RATE;
-  const combinedUsd = cadAvailable / FX_RATE + usdAvailable;
+  const combinedCad = cadAvailable + usdAvailable * FX_RATE * (1 - FX_BUFFER);
+  const combinedUsd = cadAvailable / FX_RATE * (1 - FX_BUFFER) + usdAvailable;
   const maxAmount = currency === 'CAD' ? combinedCad : currency === 'USD' ? combinedUsd : 0;
   const parsedAmount = parseFloat(amount) || 0;
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
   const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
   const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
-  const fee = method === 'wire' ? 20 : method === 'international_wire' ? 40 : 0;
+  const fee = method === 'wire' ? (currency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
   const netAmount = parsedAmount - fee;
 
   const canContinue =
@@ -220,7 +224,7 @@ export default function StandardFlow() {
             {/* Method */}
             <WizardSection visible={parsedAmount > 0 && !exceedsAvailable}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} />
+                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
               </section>
             </WizardSection>
 

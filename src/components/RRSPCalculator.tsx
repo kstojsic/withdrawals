@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Currency } from '../types';
-import { formatCurrency, formatAmountDisplay, stripFormatting, calculateWithholdingTax, getWithholdingRate } from '../data/accounts';
+import { formatCurrency, formatAmountDisplay, stripFormatting, calculateWithholdingTax, getWithholdingRate, grossFromNet } from '../data/accounts';
 import RadioButton from './RadioButton';
 import Tooltip from './Tooltip';
 
@@ -31,9 +31,7 @@ export default function RRSPCalculator({ currency, onAmountChange }: RRSPCalcula
     netAmount = grossAmount - withholdingTax;
   } else {
     netAmount = numericValue;
-    const estGross = netAmount / 0.7;
-    const rate = getWithholdingRate(estGross);
-    grossAmount = netAmount / (1 - rate / 100);
+    grossAmount = grossFromNet(netAmount);
     withholdingTax = grossAmount - netAmount;
   }
 
@@ -56,9 +54,7 @@ export default function RRSPCalculator({ currency, onAmountChange }: RRSPCalcula
     } else {
       setNetInput(val);
       const n = parseFloat(val) || 0;
-      const estGross = n / 0.7;
-      const r = getWithholdingRate(estGross);
-      const g = n / (1 - r / 100);
+      const g = grossFromNet(n);
       setGrossInput(g.toFixed(2));
       reportAmount(g);
     }
