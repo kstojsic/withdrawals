@@ -63,8 +63,8 @@ export const accounts: Account[] = [
       grants: { cad: 6500.00, usd: 1600.00 },
     },
     respBeneficiaries: [
-      { id: 'ben1', firstName: 'Dante', lastName: 'Carmichael', sin: '987 654 321' },
-      { id: 'ben2', firstName: 'Leo', lastName: 'Carmichael', sin: '123 456 789' },
+      { id: 'ben1', firstName: 'Dante', lastName: 'Carmichael', sin: '987 654 321', dateOfBirth: '2004-06-15', province: 'ON' },
+      { id: 'ben2', firstName: 'Leo', lastName: 'Carmichael', sin: '123 456 789', dateOfBirth: '2010-03-22', province: 'ON' },
     ],
   },
 ];

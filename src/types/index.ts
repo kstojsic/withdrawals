@@ -31,6 +31,8 @@ export interface RESPBeneficiary {
   firstName: string;
   lastName: string;
   sin: string;
+  dateOfBirth: string;
+  province: string;
 }
 
 export interface Account {

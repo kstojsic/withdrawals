@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Menu, Mail, User, BarChart3, Briefcase, FileText, LayoutGrid } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -21,6 +22,8 @@ const SIDEBAR_ICONS = [
 ];
 
 export default function PlatformShell({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen flex flex-col bg-qt-white">
       {/* Top ribbon */}
@@ -33,6 +36,7 @@ export default function PlatformShell({ children }: { children: ReactNode }) {
           {NAV_ITEMS.map((item) => (
             <span
               key={item}
+              onClick={item === 'Move Money' ? () => navigate('/') : undefined}
               className={`relative flex items-center h-full px-4 text-sm cursor-pointer transition-colors
                 ${item === 'Move Money'
                   ? 'font-semibold text-qt-primary'

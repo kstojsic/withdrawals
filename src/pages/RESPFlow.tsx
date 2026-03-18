@@ -13,6 +13,7 @@ import RadioButton from '../components/RadioButton';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 import InfoBox from '../components/InfoBox';
+import QuestionGroup from '../components/QuestionGroup';
 import WizardSection from '../components/WizardSection';
 import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, RESPWithdrawalType } from '../types';
@@ -56,10 +57,22 @@ export default function RESPFlow() {
   // EAP & PSE questionnaire state
   const [beneficiary, setBeneficiary] = useState<string | null>(null);
   const [residency, setResidency] = useState<'resident' | 'non_resident' | null>(null);
+  const [institutionName, setInstitutionName] = useState('');
+  const [institutionAddress, setInstitutionAddress] = useState('');
+  const [programType, setProgramType] = useState<string | null>(null);
+  const [programTypeOther, setProgramTypeOther] = useState('');
+  const [enrollmentStatus, setEnrollmentStatus] = useState<'full_time' | 'part_time' | null>(null);
+  const [programName, setProgramName] = useState('');
+  const [programStartDate, setProgramStartDate] = useState('');
+  const [programLength, setProgramLength] = useState('');
+  const [currentYear, setCurrentYear] = useState('');
+  const [weeksPerSemester, setWeeksPerSemester] = useState('');
+  const [withdrawalScope, setWithdrawalScope] = useState<'full' | 'partial' | null>(null);
   const [distribution, setDistribution] = useState<'auto' | 'specify' | null>(null);
   const [eapSpecificAmount, setEapSpecificAmount] = useState('');
   const [pseSpecificAmount, setPseSpecificAmount] = useState('');
   const [fundsRecipient, setFundsRecipient] = useState<'subscriber' | 'beneficiary' | null>(null);
+  const [beneficiaryConsent, setBeneficiaryConsent] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofConfirmed, setProofConfirmed] = useState(false);
 
@@ -115,10 +128,22 @@ export default function RESPFlow() {
     setShowSummary(false);
     setBeneficiary(null);
     setResidency(null);
+    setInstitutionName('');
+    setInstitutionAddress('');
+    setProgramType(null);
+    setProgramTypeOther('');
+    setEnrollmentStatus(null);
+    setProgramName('');
+    setProgramStartDate('');
+    setProgramLength('');
+    setCurrentYear('');
+    setWeeksPerSemester('');
+    setWithdrawalScope(null);
     setDistribution(null);
     setEapSpecificAmount('');
     setPseSpecificAmount('');
     setFundsRecipient(null);
+    setBeneficiaryConsent(false);
     setProofFile(null);
     setProofConfirmed(false);
     setCapPurpose(null);
@@ -210,17 +235,57 @@ export default function RESPFlow() {
   const selectedBeneficiary = account?.respBeneficiaries?.find((b) => b.id === beneficiary) || null;
   const hasJoint = !!account?.jointSubscriber;
 
-
+  const AGE_OF_MAJORITY_19 = ['BC', 'NB', 'NL', 'NT', 'NS', 'NU', 'YT'];
+  const beneficiaryProvince = selectedBeneficiary?.province || 'ON';
+  const beneficiaryAge = (() => {
+    if (!selectedBeneficiary?.dateOfBirth) return null;
+    const dob = new Date(selectedBeneficiary.dateOfBirth);
+    if (isNaN(dob.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const monthDiff = now.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) age--;
+    return age;
+  })();
+  const majorityAge = AGE_OF_MAJORITY_19.includes(beneficiaryProvince) ? 19 : 18;
+  const beneficiaryIsMajor = beneficiaryAge !== null && beneficiaryAge >= majorityAge;
+  const needsBeneficiaryConsent = fundsRecipient === 'subscriber' && beneficiaryIsMajor;
 
   const residencyOk = residency === 'resident';
   const beneficiaryReady = !!beneficiary && residencyOk;
   const amountReady = parsedAmount > 0 && !exceedsAvailable;
+  const educationReady = !!institutionName && !!institutionAddress && !!programType && !!enrollmentStatus && !!programName && !!programStartDate;
+
+  const eapCad = growthCad + grantsCad;
+  const eapUsd = growthUsd + grantsUsd;
+  const combinedEapCad = eapCad + eapUsd * FX_RATE * (1 - FX_BUFFER);
+  const combinedEapUsd = eapCad / FX_RATE * (1 - FX_BUFFER) + eapUsd;
+  const eapAvailable = currency === 'CAD' ? combinedEapCad : currency === 'USD' ? combinedEapUsd : 0;
+
+  const withinFirst13Weeks = (() => {
+    if (!programStartDate) return true;
+    const parts = programStartDate.split('/');
+    if (parts.length !== 3) return true;
+    const start = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+    if (isNaN(start.getTime())) return true;
+    const weeks = (Date.now() - start.getTime()) / (7 * 24 * 60 * 60 * 1000);
+    return weeks < 13;
+  })();
+
+  const eapPseLimit = enrollmentStatus === 'part_time'
+    ? (currency === 'USD' ? 4000 / FX_RATE : 4000)
+    : withinFirst13Weeks
+      ? (currency === 'USD' ? 8000 / FX_RATE : 8000)
+      : Infinity;
+
+  const eapPseMax = eapPseLimit !== Infinity ? Math.min(eapPseLimit, maxAmount) : maxAmount;
   const proofReady = proofFile && proofConfirmed;
   const signaturesReady = signed && (!hasJoint || jointSigned);
 
+  const consentReady = !needsBeneficiaryConsent || beneficiaryConsent;
   const canContinueEAPPSE =
     isEAPPSE && currency && amountReady && method && bankReady &&
-    beneficiaryReady && proofReady && signaturesReady && confirmChecked;
+    beneficiaryReady && educationReady && fundsRecipient && consentReady && proofReady && signaturesReady && confirmChecked;
 
   const canContinueCapital =
     isCapital && currency && capParsedAmount > 0 && !capExceedsAvailable && method && bankReady &&
@@ -314,6 +379,17 @@ export default function RESPFlow() {
                     setConfirmChecked(false);
                     setBeneficiary(null);
                     setResidency(null);
+                    setInstitutionName('');
+                    setInstitutionAddress('');
+                    setProgramType(null);
+                    setProgramTypeOther('');
+                    setEnrollmentStatus(null);
+                    setProgramName('');
+                    setProgramStartDate('');
+                    setProgramLength('');
+                    setCurrentYear('');
+                    setWeeksPerSemester('');
+                    setWithdrawalScope(null);
                     setDistribution(null);
                     setEapSpecificAmount('');
                     setPseSpecificAmount('');
@@ -339,17 +415,17 @@ export default function RESPFlow() {
                     <div>
                       <p className="font-semibold mb-1">Source of funds</p>
                       <ul className="text-sm list-disc ml-5 flex flex-col gap-1">
-                        <li><strong>EAP:</strong> Investment Growth + Grants</li>
-                        <li><strong>PSE:</strong> Contributions</li>
+                        <li><strong>EAP (Educational Assistance Payment):</strong> Investment Growth + Grants</li>
+                        <li><strong>PSE (Post-Secondary Education):</strong> Contributions</li>
                       </ul>
                     </div>
                     <div>
                       <p className="font-semibold mb-1">EAP withdrawal limits</p>
                       <p className="text-sm">
-                        For the first 13 weeks of enrollment, EAPs are capped at <strong>$8,000 for full-time</strong> and <strong>$4,000 for part-time</strong> students. For withdrawals from the contribution amount (PSE), there are no limits.
+                        Full-time studies are limited to <strong>$8,000</strong> in EAP within the first 13 weeks of the beneficiary's post-secondary program. Part-time studies are limited to <strong>$4,000</strong> in EAP per withdrawal.
                       </p>
                       <p className="text-sm mt-1">
-                        After 13 weeks, full-time students can withdraw any amount of EAP provided they remain enrolled. Part-time students remain limited to $4,000 per 13-week period.
+                        After 13 weeks, full-time students can withdraw any amount of EAP provided they remain enrolled. There are no limits on PSE (contribution) withdrawals.
                       </p>
                     </div>
                   </div>
@@ -369,275 +445,310 @@ export default function RESPFlow() {
               </section>
             </WizardSection>
 
-            {/* Amount */}
+            {/* EAP/PSE Questionnaire */}
             <WizardSection visible={isEAPPSE && !!currency}>
-              <section>
-                <CurrencyInput
-                  label="Gross withdrawal amount"
-                  value={amount}
-                  onChange={setAmount}
-                  error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
-                />
-                {triggersConversion && (
-                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-                    <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
-                  </div>
-                )}
-              </section>
-            </WizardSection>
-
-            {/* Method */}
-            <WizardSection visible={isEAPPSE && amountReady}>
-              <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-              </section>
-            </WizardSection>
-
-            {/* Bank (EFT or Wire) */}
-            <WizardSection visible={!!method && method !== 'international_wire'}>
-              <section>
-                <BankSelector
-                  value={selectedBank}
-                  onChange={setSelectedBank}
-                  allBanks={allBanks}
-                  onBanksChange={setAllBanks}
-                />
-              </section>
-            </WizardSection>
-
-            {/* International Wire */}
-            <WizardSection visible={method === 'international_wire'}>
-              <section>
-                <InternationalWireForm
-                  currency={currency || 'CAD'}
-                  amount={amount}
-                  data={intlWire}
-                  onChange={setIntlWire}
-                />
-              </section>
-            </WizardSection>
-
-            {/* EAP & PSE Questionnaire */}
-            <WizardSection visible={isEAPPSE && !!bankReady}>
               <section className="flex flex-col gap-6">
-                <p className="font-semibold text-base text-qt-primary leading-6">Withdrawal details</p>
 
-                {/* Pre-filled info */}
-                <div className="bg-qt-bg-3 rounded-lg p-4 flex flex-col gap-2">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-qt-secondary">Subscriber</span>
-                    <span className="text-sm font-semibold text-qt-primary">{account?.subscriberName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-xs text-qt-secondary">Account number</span>
-                    <span className="text-sm font-semibold text-qt-primary">{account?.accountNumber}</span>
-                  </div>
-                  {hasJoint && (
+                {/* Section 1: Account & Personal Information */}
+                <QuestionGroup title="Account & Personal Information" step={1} totalSteps={5}>
+                  <div className="bg-qt-bg-3 rounded-lg p-4 flex flex-col gap-2">
                     <div className="flex justify-between">
-                      <span className="text-xs text-qt-secondary">Joint subscriber</span>
-                      <span className="text-sm font-semibold text-qt-primary">{account?.jointSubscriber}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-xs text-qt-secondary">Date</span>
-                    <span className="text-sm font-semibold text-qt-primary">{new Date().toLocaleDateString('en-CA')}</span>
-                  </div>
-                </div>
-
-                {/* Q1: Beneficiary */}
-                <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                  <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-                    Who is the beneficiary for this withdrawal?
-                  </p>
-                  <div className="flex flex-col gap-3">
-                    {account?.respBeneficiaries?.map((b) => (
-                      <RadioButton
-                        key={b.id}
-                        name="resp-beneficiary"
-                        value={b.id}
-                        label={`${b.firstName} ${b.lastName}`}
-                        checked={beneficiary === b.id}
-                        onChange={() => { setBeneficiary(b.id); setResidency(null); }}
-                      />
-                    ))}
-                  </div>
-                  {selectedBeneficiary && (
-                    <div className="mt-3 bg-qt-bg-3 rounded-lg p-3">
-                      <span className="text-xs text-qt-secondary">SIN: </span>
-                      <span className="text-sm font-semibold text-qt-primary">{selectedBeneficiary.sin}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Q2: Residency */}
-                {beneficiary && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
-                      What is the beneficiary's residency status?
-                    </p>
-                    <p className="text-xs text-qt-secondary mb-3 italic">
-                      Beneficiaries studying abroad are considered Canadian residents. Note that EAP and PSE capital withdrawals are ineligible if the beneficiary is a non-resident.
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <RadioButton
-                        name="resp-residency"
-                        value="resident"
-                        label="Canadian resident"
-                        checked={residency === 'resident'}
-                        onChange={() => setResidency('resident')}
-                      />
-                      <RadioButton
-                        name="resp-residency"
-                        value="non_resident"
-                        label="Non-resident"
-                        checked={residency === 'non_resident'}
-                        onChange={() => setResidency('non_resident')}
-                      />
-                    </div>
-                    {residency === 'non_resident' && (
-                      <div className="mt-3 animate-[fadeSlideIn_0.3s_ease-out]">
-                        <InfoBox variant="error">
-                          <p><strong>Not eligible.</strong> Educational Assistance Payments (EAP) and Post-Secondary Education (PSE) capital withdrawals are ineligible if the beneficiary is a non-resident.</p>
-                        </InfoBox>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Q4: Distribution */}
-                {residencyOk && parsedAmount > 0 && !exceedsAvailable && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
-                      How would you like the funds distributed?
-                    </p>
-                    <p className="text-xs text-qt-secondary mb-3 italic">
-                      By default, funds will be automatically withdrawn from your EAP amount prior to your PSE amount.
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <RadioButton
-                        name="resp-distribution"
-                        value="auto"
-                        label="Use the default automatic distribution"
-                        checked={distribution === 'auto'}
-                        onChange={() => { setDistribution('auto'); setEapSpecificAmount(''); setPseSpecificAmount(''); }}
-                      />
-                      <RadioButton
-                        name="resp-distribution"
-                        value="specify"
-                        label="I want to specify the exact EAP and/or PSE amounts"
-                        checked={distribution === 'specify'}
-                        onChange={() => setDistribution('specify')}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Q5: Specify amounts */}
-                {distribution === 'specify' && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out] flex flex-col gap-4">
-                    <CurrencyInput
-                      label="EAP amount requested"
-                      value={eapSpecificAmount}
-                      onChange={setEapSpecificAmount}
-                    />
-                    <CurrencyInput
-                      label="PSE amount requested"
-                      value={pseSpecificAmount}
-                      onChange={setPseSpecificAmount}
-                    />
-                    <p className="text-xs text-qt-secondary italic">
-                      Each beneficiary can withdraw a maximum of $7,200 in CESG grants in a Family RESP.
-                    </p>
-                  </div>
-                )}
-
-                {/* Q6: Funds recipient */}
-                {residencyOk && parsedAmount > 0 && !exceedsAvailable && (distribution === 'auto' || distribution === 'specify') && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
-                      Who should the funds be sent to?
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <RadioButton
-                        name="resp-recipient"
-                        value="subscriber"
-                        label="Subscriber on file"
-                        checked={fundsRecipient === 'subscriber'}
-                        onChange={() => setFundsRecipient('subscriber')}
-                      />
-                      <RadioButton
-                        name="resp-recipient"
-                        value="beneficiary"
-                        label="Beneficiary"
-                        checked={fundsRecipient === 'beneficiary'}
-                        onChange={() => setFundsRecipient('beneficiary')}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* File upload: Proof of enrollment */}
-                {fundsRecipient && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
-                      Proof of enrollment
-                    </p>
-                    <p className="text-xs text-qt-secondary mb-3">
-                      Upload proof of enrollment from the beneficiary's institution (must be issued within the last six months).
-                    </p>
-                    <FileUpload file={proofFile} onFileChange={setProofFile} />
-                    {proofFile && (
-                      <label className="flex items-start gap-3 cursor-pointer mt-4">
-                        <input
-                          type="checkbox"
-                          checked={proofConfirmed}
-                          onChange={(e) => setProofConfirmed(e.target.checked)}
-                          className="mt-1 size-4 accent-qt-green cursor-pointer"
-                        />
-                        <span className="text-sm text-qt-primary leading-[22px]">
-                          I confirm I have uploaded the Proof of Enrollment (must be issued within the last six months)
-                        </span>
-                      </label>
-                    )}
-                  </div>
-                )}
-
-                {/* E-Signatures */}
-                {proofReady && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out] flex flex-col gap-6">
-                    <div>
-                      <p className="text-sm text-qt-primary leading-[22px] mb-1 font-semibold">Subscriber signature</p>
-                      <ESignature onSign={() => setSigned(true)} signed={signed} />
+                      <span className="text-xs text-qt-secondary">Subscriber</span>
+                      <span className="text-sm font-semibold text-qt-primary">{account?.subscriberName}</span>
                     </div>
                     {hasJoint && (
-                      <div>
-                        <p className="text-sm text-qt-primary leading-[22px] mb-1 font-semibold">Joint subscriber signature</p>
-                        <ESignature onSign={() => setJointSigned(true)} signed={jointSigned} />
+                      <div className="flex justify-between">
+                        <span className="text-xs text-qt-secondary">Joint subscriber</span>
+                        <span className="text-sm font-semibold text-qt-primary">{account?.jointSubscriber}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-xs text-qt-secondary">Account number</span>
+                      <span className="text-sm font-semibold text-qt-primary">{account?.accountNumber}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-qt-secondary">Date</span>
+                      <span className="text-sm font-semibold text-qt-primary">{new Date().toLocaleDateString('en-CA')}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                      Who is the beneficiary for this withdrawal?
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      {account?.respBeneficiaries?.map((b) => (
+                        <RadioButton
+                          key={b.id}
+                          name="resp-beneficiary"
+                          value={b.id}
+                          label={`${b.firstName} ${b.lastName}`}
+                          checked={beneficiary === b.id}
+                          onChange={() => { setBeneficiary(b.id); setResidency(null); }}
+                        />
+                      ))}
+                    </div>
+                    {selectedBeneficiary && (
+                      <div className="mt-3 bg-white border border-qt-border rounded-lg p-3">
+                        <span className="text-xs text-qt-secondary">SIN: </span>
+                        <span className="text-sm font-semibold text-qt-primary">{selectedBeneficiary.sin}</span>
                       </div>
                     )}
                   </div>
+
+                  {beneficiary && (
+                    <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                      <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
+                        Beneficiary residency status
+                      </p>
+                      <p className="text-xs text-qt-secondary mb-3 italic">
+                        Beneficiaries studying abroad are considered Canadian residents. EAP and PSE withdrawals are ineligible if the beneficiary is a non-resident.
+                      </p>
+                      <div className="flex gap-6">
+                        <RadioButton name="resp-residency" value="resident" label="Resident" checked={residency === 'resident'} onChange={() => setResidency('resident')} />
+                        <RadioButton name="resp-residency" value="non_resident" label="Non-Resident" checked={residency === 'non_resident'} onChange={() => setResidency('non_resident')} />
+                      </div>
+                      {residency === 'non_resident' && (
+                        <div className="mt-3">
+                          <InfoBox variant="error">
+                            <p><strong>Not eligible.</strong> EAP and PSE withdrawals are ineligible for non-resident beneficiaries.</p>
+                          </InfoBox>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </QuestionGroup>
+
+                {/* Section 2: Post-Secondary Education Details */}
+                {residencyOk && (
+                  <QuestionGroup
+                    title="Post-Secondary Education Details"
+                    step={2}
+                    totalSteps={5}
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2 sm:col-span-1">
+                        <InputField label="Educational institution name" placeholder="e.g. University of Toronto" value={institutionName} onChange={(e) => setInstitutionName(e.target.value)} />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <InputField label="Institution address (postal code required)" placeholder="e.g. 27 King's College Cir, Toronto ON M5S 1A1" value={institutionAddress} onChange={(e) => setInstitutionAddress(e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">Post-secondary program type</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <RadioButton name="program-type" value="university" label="University" checked={programType === 'university'} onChange={() => { setProgramType('university'); setProgramTypeOther(''); }} />
+                        <RadioButton name="program-type" value="cegep" label="CÉGEP / Community College" checked={programType === 'cegep'} onChange={() => { setProgramType('cegep'); setProgramTypeOther(''); }} />
+                        <RadioButton name="program-type" value="career" label="Career College" checked={programType === 'career'} onChange={() => { setProgramType('career'); setProgramTypeOther(''); }} />
+                        <RadioButton name="program-type" value="other" label="Other" checked={programType === 'other'} onChange={() => setProgramType('other')} />
+                      </div>
+                      {programType === 'other' && (
+                        <div className="mt-3 animate-[fadeSlideIn_0.3s_ease-out]">
+                          <InputField label="Please specify" placeholder="e.g. Trade school" value={programTypeOther} onChange={(e) => setProgramTypeOther(e.target.value)} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">Enrollment status</p>
+                      <div className="flex gap-6">
+                        <RadioButton name="enrollment-status" value="full_time" label="Full-time" checked={enrollmentStatus === 'full_time'} onChange={() => setEnrollmentStatus('full_time')} />
+                        <RadioButton name="enrollment-status" value="part_time" label="Part-time" checked={enrollmentStatus === 'part_time'} onChange={() => setEnrollmentStatus('part_time')} />
+                      </div>
+                      {enrollmentStatus && (
+                        <div className="mt-3">
+                          <InfoBox variant="info">
+                            <p>
+                              {enrollmentStatus === 'full_time'
+                                ? 'Full-time studies are limited to $8,000 in EAP within the first 13 weeks of enrollment. After 13 weeks, the full EAP amount can be withdrawn.'
+                                : 'Part-time studies are limited to $4,000 in EAP per withdrawal.'}
+                            </p>
+                          </InfoBox>
+                        </div>
+                      )}
+                    </div>
+
+                    <InputField label="Program name / Field of study" placeholder="e.g. Bachelor of Computer Science" value={programName} onChange={(e) => setProgramName(e.target.value)} />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField label="Program start date (MM/DD/YYYY)" placeholder="e.g. 09/01/2025" value={programStartDate} onChange={(e) => setProgramStartDate(e.target.value)} />
+                      <InputField label="Program length (years)" placeholder="e.g. 4" value={programLength} onChange={(e) => setProgramLength(e.target.value)} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <InputField label="Current year of program" placeholder="e.g. 1st, 2nd, 3rd" value={currentYear} onChange={(e) => setCurrentYear(e.target.value)} />
+                      <InputField label="Weeks per semester" placeholder="e.g. 15" value={weeksPerSemester} onChange={(e) => setWeeksPerSemester(e.target.value)} />
+                    </div>
+                  </QuestionGroup>
                 )}
 
-                {/* Certification */}
-                {signaturesReady && proofReady && (
-                  <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                    <div className="border border-qt-border rounded-lg p-5 bg-qt-bg-3">
-                      <p className="text-sm text-qt-primary leading-[22px] mb-4">
-                        I certify that the information I've provided is correct and complete, and I authorize this withdrawal from my RESP.
+                {/* Section 3: Withdrawal Details */}
+                {residencyOk && educationReady && (
+                  <QuestionGroup
+                    title="Withdrawal Details"
+                    step={3}
+                    totalSteps={5}
+                  >
+                    <div>
+                      <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                        I would like my withdrawal to be done in:
                       </p>
-                      <label className="flex items-start gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={confirmChecked}
-                          onChange={(e) => setConfirmChecked(e.target.checked)}
-                          className="mt-1 size-4 accent-qt-green cursor-pointer"
-                        />
-                        <span className="text-sm font-semibold text-qt-primary leading-[22px]">
-                          I agree
-                        </span>
-                      </label>
+                      <div className="flex gap-6">
+                        <RadioButton name="resp-scope" value="full" label="Full" checked={withdrawalScope === 'full'} onChange={() => { setWithdrawalScope('full'); setAmount(eapPseMax.toFixed(2)); }} />
+                        <RadioButton name="resp-scope" value="partial" label="Partial" checked={withdrawalScope === 'partial'} onChange={() => { setWithdrawalScope('partial'); setAmount(''); }} />
+                      </div>
                     </div>
-                  </div>
+
+                    {withdrawalScope && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        {withdrawalScope === 'partial' ? (
+                          <CurrencyInput
+                            label="Withdrawal amount"
+                            value={amount}
+                            onChange={setAmount}
+                            max={eapPseMax}
+                            maxLabel={eapPseLimit !== Infinity ? `${formatCurrency(eapPseLimit, currency!)} (${enrollmentStatus === 'part_time' ? 'part-time' : 'first 13 weeks'} limit)` : undefined}
+                            error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : parsedAmount > eapPseMax && parsedAmount > 0 ? `Amount exceeds the ${formatCurrency(eapPseLimit, currency!)} limit for ${enrollmentStatus === 'part_time' ? 'part-time' : 'full-time (first 13 weeks)'} students` : undefined}
+                          />
+                        ) : (
+                          <div className="bg-qt-bg-3 rounded-lg p-4">
+                            <p className="text-xs text-qt-secondary mb-1">Full withdrawal amount</p>
+                            <p className="text-lg font-semibold text-qt-primary">{formatCurrency(eapPseMax, currency!)}</p>
+                            {eapPseLimit !== Infinity && eapPseLimit < maxAmount && (
+                              <p className="text-xs text-qt-secondary mt-1">
+                                Capped at {formatCurrency(eapPseLimit, currency!)} ({enrollmentStatus === 'part_time' ? 'part-time' : 'first 13 weeks'} limit)
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {triggersConversion && (
+                          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                            <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="border-t border-qt-border pt-4">
+                      <p className="text-xs text-qt-secondary italic leading-relaxed">
+                        The funds will be automatically withdrawn from your EAP amount prior to the PSE amount, unless otherwise specified below. Any EAP amounts withdrawn will generate a T4A slip under the beneficiary's name.
+                      </p>
+                    </div>
+
+                    {amountReady && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">
+                          How would you like the funds distributed?
+                        </p>
+                        <div className="flex flex-col gap-3">
+                          <RadioButton name="resp-distribution" value="auto" label="Automatic (EAP first, then PSE)" checked={distribution === 'auto'} onChange={() => { setDistribution('auto'); setEapSpecificAmount(''); setPseSpecificAmount(''); }} />
+                          <RadioButton name="resp-distribution" value="specify" label="I want to specify the exact EAP and PSE amounts" checked={distribution === 'specify'} onChange={() => setDistribution('specify')} />
+                        </div>
+                      </div>
+                    )}
+
+                    {distribution === 'specify' && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out] flex flex-col gap-4 ml-5 pl-4 border-l-2 border-qt-border">
+                        <CurrencyInput label="EAP amount requested" value={eapSpecificAmount} onChange={setEapSpecificAmount} />
+                        <CurrencyInput label="PSE amount requested" value={pseSpecificAmount} onChange={setPseSpecificAmount} />
+                      </div>
+                    )}
+                  </QuestionGroup>
+                )}
+
+                {/* Section 4: Payment Direction */}
+                {amountReady && (distribution === 'auto' || distribution === 'specify') && (
+                  <QuestionGroup title="Payment Direction" step={4} totalSteps={5}>
+                    <div>
+                      <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">The funds are being sent to:</p>
+                      <div className="flex gap-6">
+                        <RadioButton name="resp-recipient" value="subscriber" label="Subscriber" checked={fundsRecipient === 'subscriber'} onChange={() => { setFundsRecipient('subscriber'); setBeneficiaryConsent(false); }} />
+                        <RadioButton name="resp-recipient" value="beneficiary" label="Beneficiary" checked={fundsRecipient === 'beneficiary'} onChange={() => { setFundsRecipient('beneficiary'); setBeneficiaryConsent(false); }} />
+                      </div>
+                    </div>
+
+                    {fundsRecipient === 'subscriber' && beneficiaryIsMajor && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out] border border-qt-border rounded-lg p-4 bg-qt-bg-3">
+                        <p className="text-sm font-semibold text-qt-primary mb-1">Beneficiary consent required</p>
+                        <p className="text-xs text-qt-secondary mb-3">
+                          {selectedBeneficiary?.firstName} {selectedBeneficiary?.lastName} is {beneficiaryAge} years old and has reached the age of majority ({majorityAge}) in {beneficiaryProvince}. The beneficiary must consent to the funds being deposited into the subscriber's account.
+                        </p>
+                        <ESignature
+                          onSign={() => setBeneficiaryConsent(true)}
+                          signed={beneficiaryConsent}
+                          label={`${selectedBeneficiary?.firstName} ${selectedBeneficiary?.lastName} — Beneficiary initials`}
+                        />
+                      </div>
+                    )}
+
+                    {fundsRecipient && consentReady && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">Payment method</p>
+                        <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
+                      </div>
+                    )}
+
+                    {fundsRecipient && consentReady && method && method !== 'international_wire' && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <BankSelector value={selectedBank} onChange={setSelectedBank} allBanks={allBanks} onBanksChange={setAllBanks} />
+                      </div>
+                    )}
+
+                    {fundsRecipient && consentReady && method === 'international_wire' && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <InternationalWireForm currency={currency || 'CAD'} amount={amount} data={intlWire} onChange={setIntlWire} />
+                      </div>
+                    )}
+                  </QuestionGroup>
+                )}
+
+                {/* Section 5: Documents & Signatures */}
+                {!!bankReady && fundsRecipient && (
+                  <QuestionGroup title="Signatures & Authorization" step={5} totalSteps={5}>
+                    <div>
+                      <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">Proof of enrollment</p>
+                      <p className="text-xs text-qt-secondary mb-3">
+                        Upload proof of enrollment from the beneficiary's institution (must be issued within the last six months).
+                      </p>
+                      <FileUpload file={proofFile} onFileChange={setProofFile} />
+                      {proofFile && (
+                        <label className="flex items-start gap-3 cursor-pointer mt-4">
+                          <input type="checkbox" checked={proofConfirmed} onChange={(e) => setProofConfirmed(e.target.checked)} className="mt-1 size-4 accent-qt-green cursor-pointer" />
+                          <span className="text-sm text-qt-primary leading-[22px]">I confirm I have uploaded valid Proof of Enrollment (issued within the last six months)</span>
+                        </label>
+                      )}
+                    </div>
+
+                    {proofReady && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out] flex flex-col gap-6">
+                        <div>
+                          <p className="text-sm text-qt-primary leading-[22px] mb-1 font-semibold">Subscriber signature</p>
+                          <ESignature onSign={() => setSigned(true)} signed={signed} />
+                        </div>
+                        {hasJoint && (
+                          <div>
+                            <p className="text-sm text-qt-primary leading-[22px] mb-1 font-semibold">Joint subscriber signature</p>
+                            <ESignature onSign={() => setJointSigned(true)} signed={jointSigned} />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {signaturesReady && proofReady && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <div className="border border-qt-border rounded-lg p-5 bg-white">
+                          <p className="text-sm text-qt-primary leading-[22px] mb-4 italic">
+                            I hereby request a withdrawal as detailed above. I confirm that the information provided is true and accurate.
+                          </p>
+                          <label className="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)} className="mt-1 size-4 accent-qt-green cursor-pointer" />
+                            <span className="text-sm font-semibold text-qt-primary leading-[22px]">I agree</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </QuestionGroup>
                 )}
               </section>
             </WizardSection>
@@ -1318,13 +1429,17 @@ export default function RESPFlow() {
                   <SummaryRow label="Beneficiary" value={selectedBeneficiary ? `${selectedBeneficiary.firstName} ${selectedBeneficiary.lastName}` : ''} />
                   <SummaryRow label="Beneficiary SIN" value={selectedBeneficiary?.sin || ''} />
                   <SummaryRow label="Residency" value="Canadian resident" />
+                  <SummaryRow label="Institution" value={institutionName} />
+                  <SummaryRow label="Program" value={programName} />
+                  <SummaryRow label="Enrollment" value={enrollmentStatus === 'full_time' ? 'Full-time' : 'Part-time'} />
+                  <SummaryRow label="Program start" value={programStartDate} />
                 </>
               )}
 
               <SummaryRow label="Currency" value={currency || ''} />
+              {isEAPPSE && <SummaryRow label="Withdrawal type" value={withdrawalScope === 'full' ? 'Full' : 'Partial'} />}
               <SummaryRow label="Withdrawal amount" value={formatCurrency(summaryAmount, currency || 'CAD')} />
 
-              {/* EAP & PSE distribution */}
               {isEAPPSE && distribution === 'specify' && (
                 <>
                   <SummaryRow label="EAP portion" value={formatCurrency(parseFloat(eapSpecificAmount) || 0, currency || 'CAD')} />
@@ -1332,9 +1447,13 @@ export default function RESPFlow() {
                 </>
               )}
 
-              {/* EAP & PSE funds recipient */}
               {isEAPPSE && (
-                <SummaryRow label="Funds sent to" value={fundsRecipient === 'subscriber' ? 'Subscriber on file' : 'Beneficiary'} />
+                <>
+                  <SummaryRow label="Funds sent to" value={fundsRecipient === 'subscriber' ? 'Subscriber' : 'Beneficiary'} />
+                  {fundsRecipient === 'subscriber' && beneficiaryIsMajor && (
+                    <SummaryRow label="Beneficiary consent" value={`${selectedBeneficiary?.firstName} ${selectedBeneficiary?.lastName} — Confirmed (age ${beneficiaryAge}, ${beneficiaryProvince})`} />
+                  )}
+                </>
               )}
 
               {/* Capital specific rows */}
