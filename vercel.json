@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/mobile", "destination": "/mobile.html" },
+    { "source": "/mobile/", "destination": "/mobile.html" },
+    { "source": "/withdraw/:path*", "destination": "/index.html" }
+  ]
+}

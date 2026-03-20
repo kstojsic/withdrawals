@@ -1,6 +1,34 @@
 @import "tailwindcss";
 
+/* ADS design tokens (transfer flow spec — fallbacks match provided literals) */
+:root {
+  --ads-size-quark: 2px;
+  --ads-size-nano: 4px;
+  --ads-size-xxs: 16px;
+  --ads-size-xxxs: 12px;
+  --ads-size-s: 24px;
+  --ads-size-xl: 44px;
+  --ads-border-radius-m: 12px;
+  --ads-border-radius-xl: 1000px;
+  --ads-color-body-contrast-100: #262d33;
+  --ads-color-secondary-400: #ced6e2;
+  --ads-color-elevation-overlay: #fff;
+  --ads-color-primary-500: #227c20;
+  --ads-font-family-body: 'Open Sans', sans-serif;
+  --ads-font-size-s: 16px;
+  --ads-font-weight-semi-bold: 600;
+  --ads-font-line-height-s: 24px;
+}
+
 @theme {
+  /*
+   * Figma: Variable collection.zip → Light Mode.tokens.json (exact hex from export).
+   * Dark Mode.tokens.json is available for future dark UI; mobile flow uses light tokens below.
+   */
+  --color-figma-neutral-00: #FFFFFF;
+  --color-figma-neutral-100: #DBDDEB;
+  --color-figma-neutral-200: #585973;
+
   /* Questrade Grey palette */
   --color-qt-white: #FFFFFF;
   --color-qt-bg-2: #F8F8FA;
@@ -28,13 +56,29 @@
   --font-body: 'Open Sans', sans-serif;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   font-family: var(--font-body);
   color: var(--color-qt-primary);
   background: var(--color-qt-white);
   margin: 0;
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mobile entry only (see mobile.html #root.mobile-root) */
+#root.mobile-root {
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--font-body);
 }
 
 * {

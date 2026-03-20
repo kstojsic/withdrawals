@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, ChevronDown, Upload, X } from 'lucide-react';
 import Tooltip from '../components/Tooltip';
@@ -1592,20 +1592,31 @@ function RESPBalanceCard({ account }: { account: Account }) {
         <BreakdownRow label="Grant Amount" cad={grantsCad} usd={grantsUsd} />
       </div>
       <div className="border-t border-qt-border">
-        <BreakdownRow label="Unavailable funds" cad={combined ? 150 + 50 * FX_RATE * (1 - FX_BUFFER) : 150} usd={combined ? 150 / FX_RATE * (1 - FX_BUFFER) + 50 : 50} />
+        <BreakdownRow
+          label="Unavailable funds"
+          cad={combined ? 150 + 50 * FX_RATE * (1 - FX_BUFFER) : 150}
+          usd={combined ? (150 / FX_RATE) * (1 - FX_BUFFER) + 50 : 50}
+        />
       </div>
     </div>
-    <p className="text-xs text-qt-secondary mt-2 leading-relaxed">
-      You can only withdraw fully settled funds. Any funds from recent trades will be available for withdrawal upon settlement (typically 1 business day).
-    </p>
     </>
   );
 }
 
-function BreakdownRow({ label, cad, usd, bold }: { label: string; cad: number; usd: number; bold?: boolean }) {
+function BreakdownRow({
+  label,
+  cad,
+  usd,
+  bold,
+}: {
+  label: ReactNode;
+  cad: number;
+  usd: number;
+  bold?: boolean;
+}) {
   return (
     <div className="grid grid-cols-3 px-5 py-3 items-center">
-      <p className={`text-sm ${bold ? 'font-semibold text-qt-primary' : 'text-qt-secondary'}`}>{label}</p>
+      <div className={`text-sm ${bold ? 'font-semibold text-qt-primary' : 'text-qt-secondary'}`}>{label}</div>
       <p className={`text-sm text-center ${bold ? 'font-semibold text-qt-primary' : 'text-qt-primary'}`}>
         {formatCurrency(cad, 'CAD')}
       </p>

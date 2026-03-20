@@ -4,9 +4,11 @@ import { formatCurrency, FX_RATE, FX_BUFFER } from '../../data/accounts';
 
 interface MobileBalanceCardProps {
   account: Account;
+  /** Slim single-row style for wizard amount step */
+  variant?: 'default' | 'compact';
 }
 
-export default function MobileBalanceCard({ account }: MobileBalanceCardProps) {
+export default function MobileBalanceCard({ account, variant = 'default' }: MobileBalanceCardProps) {
   const [combined, setCombined] = useState(false);
   const isMargin = account.type === 'MARGIN';
   const cadBalance = account.balance.cad;
@@ -20,6 +22,42 @@ export default function MobileBalanceCard({ account }: MobileBalanceCardProps) {
 
   const cadLabel = combined ? 'Combined CAD' : 'CAD';
   const usdLabel = combined ? 'Combined USD' : 'USD';
+
+  if (variant === 'compact') {
+    return (
+      <div className="border border-qt-border rounded-lg overflow-hidden bg-white">
+        <div className="flex items-center justify-between gap-2 px-2 py-1 bg-qt-bg-3 border-b border-qt-border">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-qt-secondary">Balances</span>
+          <button
+            type="button"
+            onClick={() => setCombined((v) => !v)}
+            className="flex items-center gap-1.5 min-h-8 shrink-0 cursor-pointer active:opacity-80"
+            aria-pressed={combined}
+            aria-label={combined ? 'Show separate currency amounts' : 'Show combined converted amounts'}
+          >
+            <span
+              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${combined ? 'bg-qt-green' : 'bg-qt-border'}`}
+            >
+              <span
+                className={`inline-block size-3 rounded-full bg-white shadow transition-transform ${combined ? 'translate-x-[14px]' : 'translate-x-[3px]'}`}
+              />
+            </span>
+            <span className="text-[10px] font-semibold text-qt-green-dark">{combined ? 'Combined' : 'Separate'}</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-2 divide-x divide-qt-border">
+          <div className="py-1 px-1.5 text-center min-w-0">
+            <p className="text-[9px] font-bold uppercase text-qt-secondary truncate">{cadLabel}</p>
+            <p className="text-xs font-semibold text-qt-primary tabular-nums leading-tight">{formatCurrency(displayCad, 'CAD')}</p>
+          </div>
+          <div className="py-1 px-1.5 text-center min-w-0">
+            <p className="text-[9px] font-bold uppercase text-qt-secondary truncate">{usdLabel}</p>
+            <p className="text-xs font-semibold text-qt-primary tabular-nums leading-tight">{formatCurrency(displayUsd, 'USD')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

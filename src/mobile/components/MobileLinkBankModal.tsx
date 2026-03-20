@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Building2, ChevronRight, Upload, CheckCircle2 } from 'lucide-react';
-import type { LinkedBank } from '../../types';
+import type { LinkedBank, Currency } from '../../types';
 import { bankOptions } from '../../data/accounts';
 import MobileInputField from './MobileInputField';
 import MobileButton from './MobileButton';
@@ -16,6 +16,7 @@ export default function MobileLinkBankModal({ onClose, onSave }: MobileLinkBankM
   const [transit, setTransit] = useState('');
   const [accountNum, setAccountNum] = useState('');
   const [voidCheque, setVoidCheque] = useState<File | null>(null);
+  const [depositCurrency, setDepositCurrency] = useState<Currency>('CAD');
 
   function handleSave() {
     const bankInfo = bankOptions.find((b) => b.value === selectedBank);
@@ -26,6 +27,7 @@ export default function MobileLinkBankModal({ onClose, onSave }: MobileLinkBankM
       transitNumber: transit,
       accountNumber: accountNum,
       last4: accountNum.slice(-4),
+      depositCurrency,
     };
     onSave(newBank);
   }
@@ -97,6 +99,34 @@ export default function MobileLinkBankModal({ onClose, onSave }: MobileLinkBankM
 
           {mode === 'manual' && (
             <div className="flex flex-col gap-4">
+              <div>
+                <p className="text-sm font-semibold text-qt-primary mb-2">Deposit account currency</p>
+                <p className="text-xs text-qt-secondary mb-2">Choose the currency for withdrawals to this bank.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDepositCurrency('CAD')}
+                    className={`min-h-[44px] rounded-xl border-2 px-3 text-sm font-bold transition-all ${
+                      depositCurrency === 'CAD'
+                        ? 'border-qt-green bg-qt-green-bg/30 text-qt-primary'
+                        : 'border-qt-border bg-white text-qt-secondary'
+                    }`}
+                  >
+                    CAD
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositCurrency('USD')}
+                    className={`min-h-[44px] rounded-xl border-2 px-3 text-sm font-bold transition-all ${
+                      depositCurrency === 'USD'
+                        ? 'border-qt-green bg-qt-green-bg/30 text-qt-primary'
+                        : 'border-qt-border bg-white text-qt-secondary'
+                    }`}
+                  >
+                    USD
+                  </button>
+                </div>
+              </div>
               <div>
                 <label className="text-sm leading-[22px] text-qt-primary mb-2 block">Financial institution</label>
                 <select

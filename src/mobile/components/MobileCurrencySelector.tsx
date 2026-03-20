@@ -6,36 +6,49 @@ interface MobileCurrencySelectorProps {
   onChange: (c: Currency) => void;
   cadAmount: number;
   usdAmount: number;
+  /** Tighter layout for first wizard step on small phones */
+  compact?: boolean;
 }
 
-export default function MobileCurrencySelector({ value, onChange, cadAmount, usdAmount }: MobileCurrencySelectorProps) {
+export default function MobileCurrencySelector({
+  value,
+  onChange,
+  cadAmount,
+  usdAmount,
+  compact = false,
+}: MobileCurrencySelectorProps) {
+  const pad = compact ? 'p-1.5' : 'p-2.5';
+  const title = compact ? 'text-[11px] mb-1' : 'text-xs mb-1.5';
+  const label = compact ? 'text-xs' : 'text-sm';
+  const gap = compact ? 'gap-1.5' : 'gap-2';
+
   return (
     <div>
-      <p className="font-semibold text-sm text-qt-primary mb-3">Select currency</p>
-      <div className="flex flex-col gap-3">
+      <p className={`font-semibold text-qt-primary ${title}`}>Currency</p>
+      <div className={`grid grid-cols-2 ${gap}`}>
         <button
           type="button"
           onClick={() => onChange('CAD')}
-          className={`min-h-[72px] p-4 rounded-xl border-2 text-left transition-all cursor-pointer active:scale-[0.99]
+          className={`min-h-0 rounded-lg border-2 ${pad} text-left transition-all cursor-pointer active:scale-[0.99]
             ${value === 'CAD'
               ? 'border-qt-green bg-qt-green-bg/30'
               : 'border-qt-border active:border-qt-gray-dark bg-white'
             }`}
         >
-          <p className="text-lg font-bold tracking-wider uppercase mb-1 text-qt-primary">CAD</p>
-          <p className="text-sm text-qt-secondary">Withdraw up to {formatCurrency(cadAmount, 'CAD')}</p>
+          <p className={`${label} font-bold tracking-wider uppercase text-qt-primary`}>CAD</p>
+          <p className="text-[10px] text-qt-secondary leading-tight mt-0.5">Max {formatCurrency(cadAmount, 'CAD')}</p>
         </button>
         <button
           type="button"
           onClick={() => onChange('USD')}
-          className={`min-h-[72px] p-4 rounded-xl border-2 text-left transition-all cursor-pointer active:scale-[0.99]
+          className={`min-h-0 rounded-lg border-2 ${pad} text-left transition-all cursor-pointer active:scale-[0.99]
             ${value === 'USD'
               ? 'border-qt-green bg-qt-green-bg/30'
               : 'border-qt-border active:border-qt-gray-dark bg-white'
             }`}
         >
-          <p className="text-lg font-bold tracking-wider uppercase mb-1 text-qt-primary">USD</p>
-          <p className="text-sm text-qt-secondary">Withdraw up to {formatCurrency(usdAmount, 'USD')}</p>
+          <p className={`${label} font-bold tracking-wider uppercase text-qt-primary`}>USD</p>
+          <p className="text-[10px] text-qt-secondary leading-tight mt-0.5">Max {formatCurrency(usdAmount, 'USD')}</p>
         </button>
       </div>
     </div>

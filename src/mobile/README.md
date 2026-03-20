@@ -1,20 +1,22 @@
 # Mobile-Optimized Withdrawals
 
-This folder contains the mobile-optimized version of the withdrawals app, targeting viewports **375px–430px** wide.
+Mobile viewports **375px–430px**.
 
 ## How to access
 
-- **Development**: Run `npm run dev`, then open `http://localhost:5173/mobile.html`
-- **Production**: After `npm run build`, open `mobile.html` from the `dist/` folder (or deploy and visit `/mobile.html`)
+- **Development**: `npm run dev`, open `http://localhost:5173/mobile.html`
+- **Production**: after `npm run build`, open `mobile.html` from `dist/`
 
 ## Structure
 
-- `main.tsx` — Mobile entry point
-- `App.tsx` — Mobile routing (StandardFlow only)
-- `components/` — Mobile-specific components (touch-friendly, 44px+ tap targets)
-- `pages/` — MobileStandardFlow
+- `main.tsx` — entry
+- `App.tsx` — `HashRouter` routes: `/`, `/rrsp`, `/fhsa`, `/resp`
+- `components/` — mobile UI (includes `WizardShell.tsx`)
+- `wizard/` — `types.ts`, `useWizardNavigation.ts`, `standardWizard.tsx`, `rrspWizard.tsx`, `fhsaWizard.tsx`
+- `pages/` — `MobileStandardFlow`, `MobileRRSPFlow`, `MobileFHSAFlow`, `MobileRESPFlow`
 
-## Notes
+## Wizard behavior
 
-- RRSP, FHSA, and RESP withdrawals with special tax forms show a message directing users to the full web experience.
-- TFSA, Cash, and Margin withdrawals are fully supported on mobile.
+- **`useWizardNavigation`** — visible steps, id-based remapping when visibility changes (avoids skipping screens).
+- **Progress** — Standard uses full-config indices (`progressStepIndex` / `progressTotal`). RRSP/FHSA use **`getRrspWizardShellProgress`** / **`getFhsaWizardShellProgress`** so the header stays a fixed total and doesn’t jump over branch-only steps.
+- **RESP** — placeholder route with account switching; full questionnaire can be ported from `src/pages/RESPFlow.tsx`.

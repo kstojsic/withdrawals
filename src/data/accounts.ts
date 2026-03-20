@@ -1,4 +1,4 @@
-import type { Account, LinkedBank } from '../types';
+import type { Account, BalanceInfo, Currency, LinkedBank } from '../types';
 
 export const FX_RATE = 1.36;
 export const FX_BUFFER = 0.0225;
@@ -77,6 +77,7 @@ export const linkedBanks: LinkedBank[] = [
     transitNumber: '10202',
     accountNumber: '1234567',
     last4: '4567',
+    depositCurrency: 'CAD',
   },
   {
     id: 'b2',
@@ -85,6 +86,16 @@ export const linkedBanks: LinkedBank[] = [
     transitNumber: '00016',
     accountNumber: '7654321',
     last4: '4321',
+    depositCurrency: 'CAD',
+  },
+  {
+    id: 'b-usd-1',
+    name: 'Chase Bank (USA)',
+    institutionNumber: '021',
+    transitNumber: '00001',
+    accountNumber: '9988776655',
+    last4: '6655',
+    depositCurrency: 'USD',
   },
 ];
 
@@ -102,6 +113,10 @@ export const bankOptions = [
   { value: 'eq', label: 'EQ Bank', institution: '623' },
   { value: 'other', label: 'Other', institution: '' },
 ];
+
+export function getLinkedBankDepositCurrency(bank: LinkedBank | null | undefined): Currency {
+  return bank?.depositCurrency ?? 'CAD';
+}
 
 export function formatCurrency(amount: number, currency: 'CAD' | 'USD' = 'CAD'): string {
   return new Intl.NumberFormat('en-CA', {
@@ -147,4 +162,73 @@ export function formatAmountDisplay(value: string): string {
 
 export function stripFormatting(value: string): string {
   return value.replace(/,/g, '');
+}
+
+/** Settled cash used for withdrawal availability (margin uses settled cash only). */
+export function settledBalances(account: Account): BalanceInfo {
+  if (account.type === 'MARGIN' && account.marginBreakdown) {
+    return account.marginBreakdown.settledCash;
+  }
+  return account.balance;
+}
+
+/** Convert CAD + USD balances into a single display-currency amount (FX + buffer). */
+export function balanceToDisplayAmount(cad: number, usd: number, currency: Currency): number {
+  if (currency === 'CAD') {
+    return cad + usd * FX_RATE * (1 - FX_BUFFER);
+  }
+  return (cad / FX_RATE) * (1 - FX_BUFFER) + usd;
+}
+
+/** Placeholder unavailable leg (unsettled) — same basis as mobile balance card mock. */
+const UNAVAILABLE_MOCK_CAD = 150;
+const UNAVAILABLE_MOCK_USD = 50;
+
+export interface WithdrawalAmountStepData {
+  primaryCurrency: Currency;
+  availableBalance: number;
+  unavailableBalance: number;
+  secondaryCurrency?: Currency;
+  secondaryBalance?: number;
+  maxFromSecondaryInPrimary?: number;
+  combinedMaxInPrimary?: number;
+}
+
+/**
+ * Metrics for the withdrawal amount step: primary = settled cash in withdrawal currency only;
+ * secondary = other currency; combined = both legs at current rate.
+ */
+export function getWithdrawalAmountStepData(account: Account, primaryCurrency: Currency): WithdrawalAmountStepData {
+  const { cad: cadAvail, usd: usdAvail } = settledBalances(account);
+  const unavailableBalance = balanceToDisplayAmount(UNAVAILABLE_MOCK_CAD, UNAVAILABLE_MOCK_USD, primaryCurrency);
+
+  if (primaryCurrency === 'CAD') {
+    const availableBalance = cadAvail;
+    const secondaryBalance = usdAvail;
+    const maxFromSecondaryInPrimary = usdAvail * FX_RATE * (1 - FX_BUFFER);
+    const combinedMaxInPrimary = availableBalance + maxFromSecondaryInPrimary;
+    return {
+      primaryCurrency: 'CAD',
+      availableBalance,
+      unavailableBalance,
+      secondaryCurrency: 'USD',
+      secondaryBalance,
+      maxFromSecondaryInPrimary,
+      combinedMaxInPrimary,
+    };
+  }
+
+  const availableBalance = usdAvail;
+  const secondaryBalance = cadAvail;
+  const maxFromSecondaryInPrimary = (cadAvail / FX_RATE) * (1 - FX_BUFFER);
+  const combinedMaxInPrimary = availableBalance + maxFromSecondaryInPrimary;
+  return {
+    primaryCurrency: 'USD',
+    availableBalance,
+    unavailableBalance,
+    secondaryCurrency: 'CAD',
+    secondaryBalance,
+    maxFromSecondaryInPrimary,
+    combinedMaxInPrimary,
+  };
 }

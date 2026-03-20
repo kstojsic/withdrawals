@@ -1,4 +1,32 @@
-# React + TypeScript + Vite
+# Withdrawals 2.0 (Questrade)
+
+Vite + React + TypeScript. Includes a **desktop** app (`index.html`) and a **mobile** entry (`mobile.html`, HashRouter).
+
+## Deploy to Vercel (mobile + desktop)
+
+1. Push this repo to GitHub (or GitLab / Bitbucket).
+2. In [Vercel](https://vercel.com) → **Add New Project** → import the repo.
+3. Use defaults: **Framework Preset** should detect **Vite**, **Build Command** `npm run build`, **Output Directory** `dist`, **Node** 20+ (see `package.json` `engines`).
+4. Deploy.
+
+After deploy:
+
+| App    | URL |
+|--------|-----|
+| **Mobile** | `https://YOUR-PROJECT.vercel.app/mobile` or `…/mobile.html` |
+| **Desktop** | `https://YOUR-PROJECT.vercel.app/` (routes like `/withdraw/rrsp` are rewritten to `index.html`) |
+
+From the CLI (after `npm i -g vercel` and login):
+
+```bash
+vercel
+```
+
+`vercel.json` in the repo sets `outputDirectory`, rewrites for desktop SPA routes, and a short **`/mobile`** path to `mobile.html`.
+
+---
+
+## React + TypeScript + Vite (template notes)
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

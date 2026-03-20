@@ -9,9 +9,20 @@ interface MobileCurrencyInputProps {
   max?: number;
   maxLabel?: string;
   disabled?: boolean;
+  /** Larger centered field for primary amount entry */
+  variant?: 'default' | 'hero';
 }
 
-export default function MobileCurrencyInput({ label, value, onChange, error, max, maxLabel, disabled }: MobileCurrencyInputProps) {
+export default function MobileCurrencyInput({
+  label,
+  value,
+  onChange,
+  error,
+  max,
+  maxLabel,
+  disabled,
+  variant = 'default',
+}: MobileCurrencyInputProps) {
   const [display, setDisplay] = useState(() => value ? formatAmountDisplay(value) : '');
   const [focused, setFocused] = useState(false);
   const [exceeded, setExceeded] = useState(false);
@@ -67,12 +78,21 @@ export default function MobileCurrencyInput({ label, value, onChange, error, max
 
   const showExceeded = exceeded && max !== undefined;
   const hasError = !!error || showExceeded;
+  const isHero = variant === 'hero';
 
   return (
-    <div className="flex flex-col gap-2">
-      <label className="font-semibold text-sm text-qt-primary">{label}</label>
+    <div className={`flex flex-col gap-1 ${isHero ? 'items-stretch' : ''}`}>
+      <label
+        className={`font-semibold text-qt-primary ${isHero ? 'text-center text-sm text-[#333333]' : 'text-sm'}`}
+      >
+        {label}
+      </label>
       <div className="relative">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-qt-secondary text-base">$</span>
+        <span
+          className={`absolute top-1/2 -translate-y-1/2 text-qt-secondary ${isHero ? 'left-3.5 text-lg font-semibold' : 'left-4 text-base'}`}
+        >
+          $
+        </span>
         <input
           type="text"
           inputMode="decimal"
@@ -82,11 +102,10 @@ export default function MobileCurrencyInput({ label, value, onChange, error, max
           onFocus={handleFocus}
           onBlur={handleBlur}
           disabled={disabled}
-          className={`w-full min-h-[52px] rounded-xl border-2 bg-white pl-10 pr-4 text-base leading-[22px] text-qt-primary
-            placeholder:text-qt-secondary placeholder:italic outline-none transition-colors
-            ${hasError
-              ? 'border-qt-red focus:border-qt-red'
-              : 'border-qt-gray-dark focus:border-qt-green'
+          className={`w-full rounded-xl border-2 bg-white text-qt-primary placeholder:text-qt-secondary placeholder:italic outline-none transition-colors
+            ${isHero
+              ? `min-h-[52px] pl-11 pr-4 text-center text-2xl font-semibold tracking-tight ${hasError ? 'border-qt-red focus:border-qt-red' : 'border-qt-gray-dark focus:border-qt-green'}`
+              : `min-h-[48px] pl-10 pr-4 text-base leading-[22px] ${hasError ? 'border-qt-red focus:border-qt-red' : 'border-qt-gray-dark focus:border-qt-green'}`
             }
             ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
         />

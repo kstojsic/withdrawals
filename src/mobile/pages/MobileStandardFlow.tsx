@@ -1,306 +1,349 @@
-import { useState, useRef } from 'react';
-import { CheckCircle2 } from 'lucide-react';
-import MobileAccountDropdown from '../components/MobileAccountDropdown';
-import MobileBalanceCard from '../components/MobileBalanceCard';
-import MobileCurrencySelector from '../components/MobileCurrencySelector';
-import MobileCurrencyInput from '../components/MobileCurrencyInput';
-import MobileMethodSelector from '../components/MobileMethodSelector';
-import MobileBankSelector from '../components/MobileBankSelector';
-import MobileInternationalWireForm from '../components/MobileInternationalWireForm';
-import MobileESignature from '../components/MobileESignature';
+import { useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, ChevronLeft } from 'lucide-react';
 import MobileButton from '../components/MobileButton';
-import MobileWizardSection from '../components/MobileWizardSection';
-import { linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../../data/accounts';
+import MobileAccountDropdown from '../components/MobileAccountDropdown';
+import MobileBankDepositDropdown from '../components/MobileBankDepositDropdown';
+import MobileWithdrawalMethodDropdown from '../components/MobileWithdrawalMethodDropdown';
+import MobileThreeStepProgress from '../components/MobileThreeStepProgress';
+import MobileWithdrawalAmountStep from '../components/MobileWithdrawalAmountStep';
+import MobileInputField from '../components/MobileInputField';
+import MobileESignature from '../components/MobileESignature';
+import {
+  accounts,
+  linkedBanks as defaultBanks,
+  formatCurrency,
+  getLinkedBankDepositCurrency,
+  getWithdrawalAmountStepData,
+} from '../../data/accounts';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData } from '../../types';
 
-export default function MobileStandardFlow() {
-  const [account, setAccount] = useState<Account | null>(null);
-  const [currency, setCurrency] = useState<Currency | null>(null);
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<WithdrawalMethod | null>(null);
-  const [selectedBank, setSelectedBank] = useState<string | null>(null);
-  const [allBanks, setAllBanks] = useState<LinkedBank[]>(defaultBanks);
-  const [intlWire, setIntlWire] = useState<InternationalWireData>({
-    firstName: 'Anastasia', lastName: 'Carmichael',
-    currency: 'CAD', amount: '', reason: '',
-    bankName: '', bankAddress: '', bankCity: '', bankCountry: '',
-    swiftCode: '', bankAccountNumber: '',
-    hasIntermediary: false, intermediaryBankName: '',
-    intermediarySwiftCode: '', intermediaryAccountNumber: '',
-    routingNumber: '',
-    isBrokerage: false,
-    brokerageName: '',
-    brokerageAccountName: '',
-    brokerageAccountNumber: '',
-  });
-  const [signed, setSigned] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  const isRegisteredAccount = account && ['RRSP', 'FHSA', 'RESP'].includes(account.type);
-
-  function handleAccountChange(acct: Account) {
-    if (acct.type === 'RRSP' || acct.type === 'FHSA' || acct.type === 'RESP') {
-      setAccount(acct);
-      return;
-    }
-    setAccount(acct);
-    setCurrency(null);
-    setAmount('');
-    setMethod(null);
-    setSelectedBank(null);
-    setSigned(false);
-    setShowSummary(false);
-  }
-
-  const cadAvailable = account ? account.balance.cad : 0;
-  const usdAvailable = account ? account.balance.usd : 0;
-  const combinedCad = cadAvailable + usdAvailable * FX_RATE * (1 - FX_BUFFER);
-  const combinedUsd = cadAvailable / FX_RATE * (1 - FX_BUFFER) + usdAvailable;
-  const maxAmount = currency === 'CAD' ? combinedCad : currency === 'USD' ? combinedUsd : 0;
-  const parsedAmount = parseFloat(amount) || 0;
-  const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
-  const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
-  const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
-  const fee = method === 'wire' ? (currency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
-  const netAmount = parsedAmount - fee;
-
-  const canContinue =
-    !isRegisteredAccount &&
-    currency &&
-    parsedAmount > 0 &&
-    !exceedsAvailable &&
-    method &&
-    (method === 'international_wire' ? intlWire.bankName && intlWire.swiftCode : selectedBank);
-
-  function handleSubmit() {
-    setSubmitted(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  if (submitted && account) {
-    return (
-      <div className="flex flex-col min-h-0 px-4 py-8">
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="max-w-[375px] w-full text-center">
-            <div className="size-20 rounded-full bg-qt-green-bg flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 size={40} className="text-qt-green" />
-            </div>
-            <h2 className="font-display text-2xl leading-tight text-qt-primary mb-3">
-              Withdrawal submitted
-            </h2>
-            <p className="text-base text-qt-secondary leading-6 mb-2">
-              Your withdrawal request of{' '}
-              <strong className="text-qt-primary">
-                {formatCurrency(parsedAmount, currency || 'CAD')}
-              </strong>{' '}
-              from your <strong className="text-qt-primary">{account.label}</strong> has been submitted.
-            </p>
-            <p className="text-sm text-qt-secondary leading-[22px] mb-8">
-              Processing typically takes 1-3 business days. You'll receive a confirmation email shortly.
-            </p>
-            <MobileButton
-              onClick={() => {
-                setSubmitted(false);
-                setAccount(null);
-                setCurrency(null);
-                setAmount('');
-                setMethod(null);
-                setSelectedBank(null);
-                setSigned(false);
-                setShowSummary(false);
-              }}
-            >
-              Start new withdrawal
-            </MobileButton>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const summaryModal = showSummary && account ? (() => {
-    const bank = allBanks.find((b) => b.id === selectedBank);
-    return (
-      <div
-        className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/50 max-w-[430px] mx-auto"
-        onClick={() => setShowSummary(false)}
-      >
-        <div
-          className="w-full bg-white rounded-t-2xl shadow-2xl max-h-[85vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="sticky top-0 bg-white px-4 py-4 border-b border-qt-border flex items-center justify-between">
-            <h2 className="font-display text-xl leading-tight text-qt-primary">Review & confirm</h2>
-            <button
-              type="button"
-              onClick={() => setShowSummary(false)}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-qt-secondary active:text-qt-primary text-sm font-semibold cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-          <div className="px-4 py-6">
-            <div className="bg-white border-2 border-qt-border rounded-xl divide-y divide-qt-border mb-6">
-              <MobileSummaryRow label="Account" value={`${account.label} - ${account.accountNumber}`} />
-              <MobileSummaryRow label="Currency" value={currency || ''} />
-              <MobileSummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, currency || 'CAD')} />
-              <MobileSummaryRow label="Method" value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire Transfer' : 'International Wire'} />
-              {fee > 0 && <MobileSummaryRow label="Fee" value={`-${formatCurrency(fee, currency || 'CAD')}`} />}
-              {method !== 'international_wire' && bank && (
-                <MobileSummaryRow label="Bank" value={`${bank.name} - ****${bank.last4}`} />
-              )}
-              {method === 'international_wire' && (
-                <>
-                  <MobileSummaryRow label="International bank" value={intlWire.bankName} />
-                  <MobileSummaryRow label="SWIFT code" value={intlWire.swiftCode} />
-                  {intlWire.reason && <MobileSummaryRow label="Reason" value={intlWire.reason} />}
-                </>
-              )}
-              <div className="flex items-center justify-between px-4 py-4 bg-qt-bg-3">
-                <p className="font-semibold text-base text-qt-primary">Withdrawal amount requested</p>
-                <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, netAmount), currency || 'CAD')}</p>
-              </div>
-              {((currency === 'CAD' && parsedAmount > 50000) || (currency === 'USD' && parsedAmount > 25000)) && (
-                <div className="px-4 py-3 bg-amber-50 border-t border-amber-300">
-                  <p className="text-sm text-amber-800">This amount is more than $50k CAD or $25k USD, so it will be processed in multiple withdrawals.</p>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-3">
-              <MobileButton variant="secondary" onClick={() => setShowSummary(false)}>
-                Back
-              </MobileButton>
-              <MobileButton onClick={handleSubmit}>
-                Submit withdrawal
-              </MobileButton>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  })() : null;
-
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col min-h-0">
-      {summaryModal}
-      <div className="flex-1 px-4 py-6 pb-12">
-        <h1 className="font-display text-2xl leading-tight text-qt-primary mb-6">
-          Withdraw funds
-        </h1>
-
-        <div className="flex flex-col gap-8">
-          <section>
-            <MobileAccountDropdown value={account?.id || null} onChange={handleAccountChange} />
-          </section>
-
-          {isRegisteredAccount && (
-            <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
-              <p className="text-sm text-amber-800">
-                RRSP, FHSA, and RESP withdrawals with special tax forms are available on the full web experience. Please visit Questrade on your computer to complete these withdrawals.
-              </p>
-            </div>
-          )}
-
-          <MobileWizardSection visible={!!account && !isRegisteredAccount}>
-            <section>
-              {account && <MobileBalanceCard account={account} />}
-            </section>
-          </MobileWizardSection>
-
-          <MobileWizardSection visible={!!account && !isRegisteredAccount}>
-            <section>
-              <MobileCurrencySelector
-                value={currency}
-                onChange={(c) => { setCurrency(c); setAmount(''); }}
-                cadAmount={combinedCad}
-                usdAmount={combinedUsd}
-              />
-            </section>
-          </MobileWizardSection>
-
-          <MobileWizardSection visible={!!currency}>
-            <section>
-              <MobileCurrencyInput
-                label="Withdrawal amount"
-                value={amount}
-                onChange={setAmount}
-                error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
-              />
-              {currency && !exceedsAvailable && (
-                <p className="text-xs text-qt-secondary mt-2">
-                  Available: {formatCurrency(maxAmount, currency)}
-                </p>
-              )}
-              {triggersConversion && (
-                <div className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
-                  <p className="text-sm text-amber-800">
-                    Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.
-                  </p>
-                </div>
-              )}
-            </section>
-          </MobileWizardSection>
-
-          <MobileWizardSection visible={parsedAmount > 0 && !exceedsAvailable}>
-            <section>
-              <MobileMethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-            </section>
-          </MobileWizardSection>
-
-          <MobileWizardSection visible={!!method && method !== 'international_wire'}>
-            <section>
-              <MobileBankSelector
-                value={selectedBank}
-                onChange={setSelectedBank}
-                allBanks={allBanks}
-                onBanksChange={setAllBanks}
-              />
-            </section>
-          </MobileWizardSection>
-
-          <MobileWizardSection visible={method === 'international_wire'}>
-            <section>
-              <MobileInternationalWireForm
-                currency={currency || 'CAD'}
-                amount={amount}
-                data={intlWire}
-                onChange={setIntlWire}
-              />
-              <div className="mt-6">
-                <MobileESignature onSign={() => setSigned(true)} signed={signed} />
-              </div>
-            </section>
-          </MobileWizardSection>
-
-          <MobileWizardSection visible={!!canContinue}>
-            <div className="flex flex-col gap-3 pt-4 border-t border-qt-border">
-              <MobileButton
-                variant="secondary"
-                onClick={() => { setAccount(null); setCurrency(null); setAmount(''); setMethod(null); }}
-              >
-                Cancel
-              </MobileButton>
-              <MobileButton
-                onClick={() => { setShowSummary(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              >
-                Continue
-              </MobileButton>
-            </div>
-          </MobileWizardSection>
-        </div>
-        <div ref={bottomRef} />
-      </div>
+    <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+      <p className="text-xs text-qt-secondary shrink-0">{label}</p>
+      <p className="text-xs font-semibold text-qt-primary text-right max-w-[58%] break-words">{value}</p>
     </div>
   );
 }
 
-function MobileSummaryRow({ label, value }: { label: string; value: string }) {
+const STEP_TITLES = ['Account information', 'Withdrawal Details', 'Review and Confirm'] as const;
+
+const defaultIntl: InternationalWireData = {
+  firstName: 'Anastasia',
+  lastName: 'Carmichael',
+  currency: 'CAD',
+  amount: '',
+  reason: '',
+  bankName: '',
+  bankAddress: '',
+  bankCity: '',
+  bankCountry: '',
+  swiftCode: '',
+  bankAccountNumber: '',
+  hasIntermediary: false,
+  intermediaryBankName: '',
+  intermediarySwiftCode: '',
+  intermediaryAccountNumber: '',
+  routingNumber: '',
+  isBrokerage: false,
+  brokerageName: '',
+  brokerageAccountName: '',
+  brokerageAccountNumber: '',
+};
+
+export default function MobileStandardFlow() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState<WithdrawalMethod>('eft');
+  const [selectedBank, setSelectedBank] = useState<string | null>(null);
+  const [allBanks, setAllBanks] = useState<LinkedBank[]>(defaultBanks);
+  const [intlWire, setIntlWire] = useState<InternationalWireData>(defaultIntl);
+  const [signed, setSigned] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const bank = allBanks.find((b) => b.id === selectedBank);
+
+  const withdrawalCurrency: Currency = useMemo(() => {
+    if (method === 'international_wire') return intlWire.currency;
+    return getLinkedBankDepositCurrency(bank);
+  }, [method, intlWire.currency, bank]);
+
+  const handleAccountChange = useCallback(
+    (acct: Account) => {
+      if (acct.type === 'RRSP') {
+        navigate('/rrsp');
+        return;
+      }
+      if (acct.type === 'FHSA') {
+        navigate('/fhsa');
+        return;
+      }
+      if (acct.type === 'RESP') {
+        navigate('/resp');
+        return;
+      }
+      setAccount(acct);
+      setAmount('');
+      setSelectedBank(null);
+      setSigned(false);
+      setStep(0);
+    },
+    [navigate],
+  );
+
+  const parsedAmount = parseFloat(amount) || 0;
+
+  const withdrawalAmountStepData = useMemo(
+    () => (account ? getWithdrawalAmountStepData(account, withdrawalCurrency) : null),
+    [account, withdrawalCurrency],
+  );
+  const fee =
+    method === 'wire' ? (withdrawalCurrency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
+  const netAmount = parsedAmount - fee;
+
+  const step0Complete = useMemo(() => {
+    if (!account) return false;
+    if (method === 'international_wire') {
+      return !!(intlWire.bankName?.trim() && intlWire.swiftCode?.trim() && signed);
+    }
+    return !!selectedBank;
+  }, [account, method, intlWire.bankName, intlWire.swiftCode, selectedBank, signed]);
+
+  const renderReviewSummary = useCallback(() => {
+    if (!account) return null;
+    return (
+      <>
+        <SummaryRow label="Account" value={`${account.label} - ${account.accountNumber}`} />
+        {method !== 'international_wire' && bank && (
+          <SummaryRow label="Deposit bank" value={`${bank.name} · ****${bank.last4} (${getLinkedBankDepositCurrency(bank)})`} />
+        )}
+        <SummaryRow label="Currency" value={withdrawalCurrency} />
+        <SummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, withdrawalCurrency)} />
+        <SummaryRow
+          label="Method"
+          value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire transfer' : 'International wire'}
+        />
+        {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, withdrawalCurrency)}`} />}
+        {method === 'international_wire' && (
+          <>
+            <SummaryRow label="Receiving bank" value={intlWire.bankName} />
+            <SummaryRow label="SWIFT / BIC" value={intlWire.swiftCode} />
+          </>
+        )}
+        <div className="flex items-center justify-between gap-2 bg-qt-bg-3 px-3 py-3">
+          <p className="text-xs font-semibold text-qt-primary">Net to you</p>
+          <p className="text-sm font-semibold text-qt-green-dark tabular-nums">
+            {formatCurrency(Math.max(0, netAmount), withdrawalCurrency)}
+          </p>
+        </div>
+      </>
+    );
+  }, [account, bank, fee, intlWire.bankName, intlWire.swiftCode, method, netAmount, parsedAmount, withdrawalCurrency]);
+
+  const handleMethodChange = useCallback((m: WithdrawalMethod) => {
+    setMethod(m);
+    setSigned(false);
+    if (m !== 'international_wire') {
+      setIntlWire((d) => ({ ...d, currency: 'CAD' }));
+    }
+  }, []);
+
+  const handlePrimary = useCallback(() => {
+    if (step === 0 && step0Complete) {
+      setStep(1);
+      return;
+    }
+    if (step === 1) {
+      return;
+    }
+    if (step === 2) {
+      setSubmitted(true);
+    }
+  }, [step, step0Complete]);
+
+  const primaryLabel = 'Next';
+  const primaryDisabled =
+    step === 0 ? !step0Complete : step === 2 ? !account || netAmount < 0 : true;
+
+  if (submitted && account) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-6">
+        <p className="text-center text-xs font-semibold text-qt-secondary">Complete</p>
+        <div className="mx-auto mb-4 mt-2 flex size-20 items-center justify-center rounded-full bg-qt-green-bg">
+          <CheckCircle2 size={40} className="text-qt-green" />
+        </div>
+        <h2 className="mb-3 text-center text-xl font-semibold text-qt-primary">Withdrawal submitted</h2>
+        <div className="mb-6 divide-y divide-figma-neutral-100 rounded-lg border border-figma-neutral-100 bg-figma-neutral-00">
+          {renderReviewSummary()}
+        </div>
+        <p className="mb-2 text-center text-sm text-qt-secondary">
+          Your withdrawal request of{' '}
+          <strong className="text-qt-primary">{formatCurrency(parsedAmount, withdrawalCurrency)}</strong> from{' '}
+          <strong className="text-qt-primary">{account.label}</strong> has been submitted.
+        </p>
+        <p className="mb-8 text-center text-xs text-qt-secondary">
+          Processing typically takes 1–3 business days. You&apos;ll receive a confirmation email shortly.
+        </p>
+        <div className="flex justify-center px-[length:var(--ads-size-xxs)]">
+          <MobileButton
+            fullWidth
+            className="!h-[length:var(--ads-size-xl)] !min-h-[length:var(--ads-size-xl)] !gap-[length:var(--ads-size-nano)] !rounded-[length:var(--ads-border-radius-xl)] !bg-[var(--ads-color-primary-500)] !px-[length:var(--ads-size-s)] !py-[length:var(--ads-size-quark)] !text-base text-white active:opacity-90"
+            onClick={() => {
+              setSubmitted(false);
+              setAccount(null);
+              setAmount('');
+              setMethod('eft');
+              setSelectedBank(null);
+              setSigned(false);
+              setIntlWire(defaultIntl);
+              setStep(0);
+            }}
+          >
+            Start new withdrawal
+          </MobileButton>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center justify-between px-4 py-4">
-      <p className="text-sm text-qt-secondary">{label}</p>
-      <p className="text-sm font-semibold text-qt-primary text-right max-w-[60%] break-words">{value}</p>
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+      {/* ADS: progress block — flex column, padding 0 var(--ads-size-xxs), gap var(--ads-size-xxxs), align-items flex-start, align-self stretch */}
+      <div className="relative shrink-0">
+        {step > 0 && (
+          <button
+            type="button"
+            onClick={() => setStep((s) => (s === 2 ? 1 : 0))}
+            className="absolute left-[length:var(--ads-size-xxs)] top-3 z-10 flex size-9 items-center justify-center rounded-full text-[var(--ads-color-body-contrast-100)] active:bg-qt-bg-3 cursor-pointer"
+            aria-label="Back"
+          >
+            <ChevronLeft className="size-[18px]" strokeWidth={2.25} aria-hidden />
+          </button>
+        )}
+        <div className="flex flex-col items-start gap-[length:var(--ads-size-xxxs)] self-stretch px-[length:var(--ads-size-xxs)] pb-2 pt-2">
+          {/* body/additional/medium-semibold */}
+          <h1 className="w-full text-center font-[family-name:var(--ads-font-family-body)] text-[length:var(--ads-font-size-s)] font-semibold leading-[length:var(--ads-font-line-height-s)] text-[var(--ads-color-body-contrast-100)]">
+            {STEP_TITLES[step]}
+          </h1>
+          <MobileThreeStepProgress step={step} />
+        </div>
+      </div>
+
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[length:var(--ads-size-xxs)] pt-2 ${
+          step === 1 ? 'pb-[max(1.25rem,env(safe-area-inset-bottom))]' : 'pb-4'
+        }`}
+      >
+        {step === 0 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[11px] font-medium text-qt-primary">Tell us where to send your funds.</p>
+            <MobileAccountDropdown accounts={accounts} value={account?.id ?? null} onChange={handleAccountChange} />
+            {account && (
+              <>
+                {method !== 'international_wire' ? (
+                  <MobileBankDepositDropdown
+                    value={selectedBank}
+                    onChange={setSelectedBank}
+                    allBanks={allBanks}
+                    onBanksChange={setAllBanks}
+                  />
+                ) : (
+                  <p className="rounded-lg bg-qt-bg-3 px-3 py-2 text-[11px] text-qt-secondary">
+                    International wires go to the bank you specify below — no Canadian deposit account needed.
+                  </p>
+                )}
+                <MobileWithdrawalMethodDropdown
+                  value={method}
+                  onChange={handleMethodChange}
+                  currencyHint={withdrawalCurrency}
+                />
+                {method === 'international_wire' && (
+                  <div className="flex flex-col gap-3 rounded-xl border border-figma-neutral-100 bg-figma-neutral-00 p-3">
+                    <p className="text-xs font-semibold text-qt-primary">Wire currency</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['CAD', 'USD'] as const).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setIntlWire((d) => ({ ...d, currency: c }))}
+                          className={`min-h-[40px] rounded-lg border-2 text-sm font-bold ${
+                            intlWire.currency === c
+                              ? 'border-qt-green bg-qt-green-bg/30'
+                              : 'border-figma-neutral-100 bg-figma-neutral-00'
+                          }`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                    <MobileInputField
+                      label="Receiving bank name"
+                      placeholder="Bank name"
+                      value={intlWire.bankName}
+                      onChange={(e) => setIntlWire((d) => ({ ...d, bankName: e.target.value }))}
+                    />
+                    <MobileInputField
+                      label="SWIFT / BIC code"
+                      placeholder="e.g. BOFAUS3N"
+                      value={intlWire.swiftCode}
+                      onChange={(e) => setIntlWire((d) => ({ ...d, swiftCode: e.target.value }))}
+                    />
+                    <MobileESignature onSign={() => setSigned(true)} signed={signed} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {step === 1 && account && withdrawalAmountStepData && (
+          <div className="flex flex-col items-center">
+            <MobileWithdrawalAmountStep
+              primaryCurrency={withdrawalAmountStepData.primaryCurrency}
+              availableBalance={withdrawalAmountStepData.availableBalance}
+              unavailableBalance={withdrawalAmountStepData.unavailableBalance}
+              secondaryCurrency={withdrawalAmountStepData.secondaryCurrency}
+              secondaryBalance={withdrawalAmountStepData.secondaryBalance}
+              maxFromSecondaryInPrimary={withdrawalAmountStepData.maxFromSecondaryInPrimary}
+              combinedMaxInPrimary={withdrawalAmountStepData.combinedMaxInPrimary}
+              amount={amount}
+              onAmountChange={setAmount}
+              onContinue={(entered) => {
+                setAmount(entered > 0 ? entered.toFixed(2) : '');
+                setStep(2);
+              }}
+            />
+          </div>
+        )}
+
+        {step === 2 && account && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-qt-secondary">Check the details below before submitting.</p>
+            <div className="divide-y divide-figma-neutral-100 overflow-hidden rounded-xl border border-figma-neutral-100 bg-figma-neutral-00">
+              {renderReviewSummary()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Step 1 uses in-flow Continue; other steps pin primary CTA here */}
+      {step !== 1 && (
+        <div className="shrink-0 px-[length:var(--ads-size-xxs)] pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex w-full max-w-[357px] flex-col">
+            <MobileButton
+              onClick={handlePrimary}
+              disabled={primaryDisabled}
+              fullWidth
+              className="!h-[length:var(--ads-size-xl)] !min-h-[length:var(--ads-size-xl)] !gap-[length:var(--ads-size-nano)] !rounded-[length:var(--ads-border-radius-xl)] !bg-[var(--ads-color-primary-500)] !px-[length:var(--ads-size-s)] !py-[length:var(--ads-size-quark)] !text-base text-white active:opacity-90"
+            >
+              {primaryLabel}
+            </MobileButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

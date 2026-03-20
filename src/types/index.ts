@@ -56,6 +56,8 @@ export interface LinkedBank {
   transitNumber: string;
   accountNumber: string;
   last4: string;
+  /** Currency for EFT/wire deposits to this linked account (defaults to CAD if omitted). */
+  depositCurrency?: Currency;
 }
 
 export interface InternationalWireData {

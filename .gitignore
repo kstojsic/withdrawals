@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# Local design exports / archives (not needed for Vercel build)
+*.zip
+variable-collection-extracted/
+Mobile Design/

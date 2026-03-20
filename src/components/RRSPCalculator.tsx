@@ -7,9 +7,11 @@ import Tooltip from './Tooltip';
 interface RRSPCalculatorProps {
   currency: Currency;
   onAmountChange: (grossAmount: number) => void;
+  /** Tighter layout for mobile wizard (single screen) */
+  compact?: boolean;
 }
 
-export default function RRSPCalculator({ currency, onAmountChange }: RRSPCalculatorProps) {
+export default function RRSPCalculator({ currency, onAmountChange, compact = false }: RRSPCalculatorProps) {
   const [mode, setMode] = useState<'gross' | 'net'>('gross');
   const [grossInput, setGrossInput] = useState('');
   const [netInput, setNetInput] = useState('');
@@ -62,6 +64,63 @@ export default function RRSPCalculator({ currency, onAmountChange }: RRSPCalcula
 
   function switchMode(newMode: 'gross' | 'net') {
     setMode(newMode);
+  }
+
+  if (compact) {
+    return (
+      <div className="min-h-0">
+        <p className="text-xs font-semibold text-qt-primary mb-1">Calculator</p>
+        <div className="flex rounded-lg border border-qt-border overflow-hidden mb-1.5">
+          <button
+            type="button"
+            onClick={() => switchMode('gross')}
+            className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${mode === 'gross' ? 'bg-qt-green text-white' : 'bg-white text-qt-primary'}`}
+          >
+            Gross
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('net')}
+            className={`flex-1 py-1 text-[11px] font-semibold border-l border-qt-border transition-colors ${mode === 'net' ? 'bg-qt-green text-white' : 'bg-white text-qt-primary'}`}
+          >
+            Net
+          </button>
+        </div>
+        <div className="relative mb-1.5">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-qt-secondary text-xs">$</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={inputValue}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === '' || /^[0-9]*\.?[0-9]*$/.test(v)) {
+                handleInputChange(v);
+              }
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            className="w-full h-9 rounded-md border border-qt-gray-dark bg-white pl-7 pr-14 text-xs text-qt-primary placeholder:text-qt-secondary placeholder:italic outline-none focus:border-qt-green"
+          />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-qt-secondary">
+            {mode === 'gross' ? 'GROSS' : 'NET'} {currency}
+          </span>
+        </div>
+        {numericValue > 0 && (
+          <div className="border border-qt-border rounded-md overflow-hidden text-xs">
+            <div className="flex items-center justify-between px-2 py-0.5 bg-qt-bg-3 border-b border-qt-border">
+              <span className="text-[10px] font-bold uppercase text-qt-secondary">{currency}</span>
+            </div>
+            <CalcRow compact label="Gross" amount={grossAmount} currency={currency} />
+            <CalcRow compact label={`Tax (${rate}%)`} amount={-withholdingTax} currency={currency} negative tooltip="Questrade must make this tax payment to the CRA on your behalf" />
+            <div className="border-t border-qt-border">
+              <CalcRow compact label="Net" amount={netAmount} currency={currency} bold />
+            </div>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -134,6 +193,7 @@ function CalcRow({
   bold,
   negative,
   tooltip,
+  compact,
 }: {
   label: string;
   amount: number;
@@ -141,7 +201,21 @@ function CalcRow({
   bold?: boolean;
   negative?: boolean;
   tooltip?: string;
+  compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div className="flex items-center justify-between px-2 py-1 border-b border-qt-border last:border-b-0">
+        <p className={`text-[11px] flex items-center gap-1 min-w-0 ${bold ? 'font-semibold text-qt-primary' : 'text-qt-secondary'}`}>
+          <span className="truncate">{label}</span>
+          {tooltip && <Tooltip content={tooltip} />}
+        </p>
+        <p className={`text-[11px] font-medium tabular-nums shrink-0 ml-1 ${bold ? 'font-semibold text-qt-primary' : negative ? 'text-qt-red' : 'text-qt-primary'}`}>
+          {negative && amount !== 0 ? '-' : ''}{formatCurrency(Math.abs(amount), currency)}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center justify-between px-5 py-3 border-b border-qt-border last:border-b-0">
       <p className={`text-sm flex items-center gap-1.5 ${bold ? 'font-semibold text-qt-primary' : 'text-qt-secondary'}`}>

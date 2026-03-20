@@ -17,27 +17,27 @@ function getMethods(currency?: Currency | null): { value: WithdrawalMethod; labe
 
 export default function MobileMethodSelector({ value, onChange, currency }: MobileMethodSelectorProps) {
   return (
-    <div>
-      <p className="font-semibold text-sm text-qt-primary mb-3">Select withdrawal method</p>
-      <div className="flex flex-col gap-3">
+    <div className="flex flex-1 min-h-0 flex-col">
+      <p className="font-semibold text-xs text-qt-primary mb-1.5 shrink-0">Withdrawal method</p>
+      <div className="flex flex-col gap-1.5 min-h-0">
         {getMethods(currency).map((m) => (
           <button
             key={m.value}
             type="button"
             onClick={() => onChange(m.value)}
-            className={`min-h-[64px] flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all cursor-pointer active:scale-[0.99]
+            className={`min-h-[44px] flex items-center gap-2.5 p-2.5 rounded-lg border-2 text-left transition-all cursor-pointer active:scale-[0.99]
               ${value === m.value
                 ? 'border-qt-green bg-qt-green-bg/30'
                 : 'border-qt-border active:border-qt-gray-dark bg-white'
               }`}
           >
-            <div className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0
+            <div className={`size-4 rounded-full border-2 flex items-center justify-center shrink-0
               ${value === m.value ? 'border-qt-green' : 'border-qt-gray-dark'}`}>
-              {value === m.value && <div className="size-2.5 rounded-full bg-qt-green" />}
+              {value === m.value && <div className="size-2 rounded-full bg-qt-green" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-qt-primary">{m.label}</p>
-              <p className="text-xs text-qt-secondary mt-0.5">{m.description}</p>
+              <p className="font-semibold text-xs text-qt-primary leading-tight">{m.label}</p>
+              <p className="text-[10px] text-qt-secondary mt-0.5 leading-snug">{m.description}</p>
             </div>
           </button>
         ))}
