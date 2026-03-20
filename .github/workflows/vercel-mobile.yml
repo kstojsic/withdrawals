@@ -1,5 +1,7 @@
-# Production deploy on push to `mobile`. Requires GitHub secrets (see docs/VERCEL_DEPLOY.md):
-# VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+# Production deploy on push to `mobile`.
+# Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID — see docs/VERCEL_DEPLOY.md
+#
+# Uses remote build on Vercel (no local `vercel pull` / `vercel build --prebuilt`) — fewer CI failures.
 
 name: Deploy to Vercel (mobile branch)
 
@@ -9,38 +11,37 @@ on:
       - mobile
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Require Vercel secrets
-        run: |
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "::error::Missing GitHub Actions secrets. Add VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID — see docs/VERCEL_DEPLOY.md"
-            exit 1
-          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
 
-      - name: Install
-        run: npm ci
+      - name: Check secrets are set
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          ok=1
+          if [ -z "${VERCEL_TOKEN:-}" ]; then echo "::error::VERCEL_TOKEN is empty — add it under Repo → Settings → Secrets → Actions"; ok=0; fi
+          if [ -z "${VERCEL_ORG_ID:-}" ]; then echo "::error::VERCEL_ORG_ID is empty"; ok=0; fi
+          if [ -z "${VERCEL_PROJECT_ID:-}" ]; then echo "::error::VERCEL_PROJECT_ID is empty"; ok=0; fi
+          if [ "$ok" -eq 0 ]; then exit 1; fi
+          echo "All three secrets are non-empty (lengths: token=${#VERCEL_TOKEN} org=${#VERCEL_ORG_ID} project=${#VERCEL_PROJECT_ID})"
 
-      - name: Pull Vercel project settings
-        run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-
-      - name: Build (Vercel)
-        run: npx vercel build --prod --token="$VERCEL_TOKEN"
-
-      - name: Deploy to production
-        run: npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+      - name: Deploy to Vercel (remote build)
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: npx vercel@50.34.3 deploy --prod --yes --token="$VERCEL_TOKEN"

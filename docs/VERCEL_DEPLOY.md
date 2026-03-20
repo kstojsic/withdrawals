@@ -42,3 +42,12 @@ Repo **Settings** → **Secrets and variables** → **Actions** → **New reposi
 - **Mobile app:** `https://YOUR-PROJECT.vercel.app/mobile`
 
 If you use **both** Git integration and this workflow, you may get two deployments per push — you can disconnect Git deploys or disable the workflow.
+
+### Workflow fails in a few seconds
+
+- **“VERCEL_TOKEN is empty”** (or org/project): add all three secrets under **Settings → Secrets and variables → Actions**. Re-run the job after saving.
+- **Paste secrets with no extra spaces or line breaks** (especially after copying the token).
+- **Org ID** must be **`team_…`** (team) or **`user_…`** (personal), not the project slug.
+- **Project ID** is **`prj_…`** from **Project → Settings → General**.
+
+The workflow uses **`vercel deploy --prod`** (build runs on Vercel), not local `vercel build --prebuilt`.
