@@ -24,6 +24,22 @@ vercel
 
 `vercel.json` in the repo sets `outputDirectory`, rewrites for desktop SPA routes, and a short **`/mobile`** path to `mobile.html`.
 
+### Production URL not updating when you push `mobile`
+
+Vercel treats one Git branch as **Production** (often **`main`**). Pushes to any **other** branch (e.g. **`mobile`**) only create **Preview** deployments — they get their **own URL** in the deployment row (e.g. `withdrawals-git-mobile-….vercel.app`). Your main **`*.vercel.app`** link will **not** change until a **production** deploy runs.
+
+**Fix (pick one):**
+
+1. **Use `mobile` as production** (best if you only care about this branch):  
+   Vercel → **Project** → **Settings** → **Git** → **Production Branch** → set to **`mobile`** → Save.  
+   After that, pushes to `mobile` update **`https://YOUR-PROJECT.vercel.app`** (and `/mobile`).
+
+2. **Keep `main` as production**: merge `mobile` into `main` when you want the main link updated, **or** open each Preview deployment in the dashboard and use the **Preview URL** it shows.
+
+3. **Stale page in the browser**: hard refresh (`Ctrl+Shift+R`) or try incognito. Mobile HTML is sent with short cache headers so new deploys are picked up sooner.
+
+Also confirm **Settings → Git** shows this repo and the correct **root directory** (usually empty / repo root).
+
 ---
 
 ## React + TypeScript + Vite (template notes)
