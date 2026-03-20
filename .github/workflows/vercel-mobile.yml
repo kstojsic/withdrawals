@@ -1,19 +1,12 @@
-# Deploys when you push to the `mobile` branch.
-# Add these GitHub repo secrets (Vercel → Project → Settings → General):
-#   VERCEL_TOKEN      — https://vercel.com/account/tokens
-#   VERCEL_ORG_ID     — team_… or user_… (from .vercel/project.json after `vercel link`, or Project Settings)
-#   VERCEL_PROJECT_ID — prj_…
+# Optional: run manually from GitHub → Actions if you use token-based deploy.
+# With the repo connected in Vercel, pushes to `mobile` already trigger deployments.
 #
-# If the GitHub repo is already connected in Vercel, pushes to `mobile` also trigger
-# Vercel’s built-in Git deploys. Set Production Branch to `mobile` there if this branch
-# should update your production URL.
+# Secrets (repo → Settings → Secrets): VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 
-name: Deploy to Vercel (mobile branch)
+name: Deploy to Vercel (manual)
 
 on:
-  push:
-    branches:
-      - mobile
+  workflow_dispatch:
 
 jobs:
   deploy:
