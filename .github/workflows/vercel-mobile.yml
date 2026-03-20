@@ -33,9 +33,9 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           ok=1
-          if [ -z "${VERCEL_TOKEN:-}" ]; then echo "::error::VERCEL_TOKEN is empty — add it under Repo → Settings → Secrets → Actions"; ok=0; fi
-          if [ -z "${VERCEL_ORG_ID:-}" ]; then echo "::error::VERCEL_ORG_ID is empty"; ok=0; fi
-          if [ -z "${VERCEL_PROJECT_ID:-}" ]; then echo "::error::VERCEL_PROJECT_ID is empty"; ok=0; fi
+          if [ -z "${VERCEL_TOKEN:-}" ]; then echo "::error::VERCEL_TOKEN is empty — see docs/GITHUB_SECRETS_STEP_BY_STEP.md"; ok=0; fi
+          if [ -z "${VERCEL_ORG_ID:-}" ]; then echo "::error::VERCEL_ORG_ID is empty — see docs/GITHUB_SECRETS_STEP_BY_STEP.md"; ok=0; fi
+          if [ -z "${VERCEL_PROJECT_ID:-}" ]; then echo "::error::VERCEL_PROJECT_ID is empty — see docs/GITHUB_SECRETS_STEP_BY_STEP.md"; ok=0; fi
           if [ "$ok" -eq 0 ]; then exit 1; fi
           echo "All three secrets are non-empty (lengths: token=${#VERCEL_TOKEN} org=${#VERCEL_ORG_ID} project=${#VERCEL_PROJECT_ID})"
 

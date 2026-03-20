@@ -13,6 +13,8 @@ If pushes to GitHub don’t create a new deployment, either **connect the repo i
 
 After you add secrets, **every push to `mobile`** runs a production deploy.
 
+**If the workflow says secrets are empty:** follow **`docs/GITHUB_SECRETS_STEP_BY_STEP.md`** (exact names and where to click).
+
 ### 1. Create a Vercel token
 
 [Vercel → Account → Tokens](https://vercel.com/account/tokens) → **Create** → copy the value (used as `VERCEL_TOKEN`).
