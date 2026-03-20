@@ -6,6 +6,13 @@ Mobile viewports **375px–430px**.
 
 - **Development**: `npm run dev`, open `http://localhost:5173/mobile.html`
 - **Production**: after `npm run build`, open `mobile.html` from `dist/`
+- **Vercel**: deploy the repo from the project root. The mobile app is served at **`/mobile`** (rewrites to `mobile.html` in `vercel.json`).
+  1. Install deps: `npm install`
+  2. Log in: `npx vercel login` (once)
+  3. Link & first deploy: `npx vercel` (preview) or `npm run deploy:vercel` (production)
+  4. Open: `https://<your-project>.vercel.app/mobile` (Hash routes: `#/`, `#/fhsa`, etc.)
+
+If the Vercel project already exists, run `npx vercel link` in this folder first.
 
 ## Structure
 

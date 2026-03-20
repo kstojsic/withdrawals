@@ -53,7 +53,6 @@ export default function FHSAFlow() {
   const [signed, setSigned] = useState(false);
   const [qualifyingEligible, setQualifyingEligible] = useState(false);
   const [qualifyingData, setQualifyingData] = useState<Record<string, unknown>>({});
-  const [confirmChecked, setConfirmChecked] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -87,7 +86,6 @@ export default function FHSAFlow() {
     setSigned(false);
     setQualifyingEligible(false);
     setQualifyingData({});
-    setConfirmChecked(false);
     setShowSummary(false);
     setOvpExcessAmount('');
     setOvpSource(null);
@@ -118,8 +116,7 @@ export default function FHSAFlow() {
     : selectedBank;
 
   const canContinueQualifying =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady
-    && qualifyingEligible && confirmChecked;
+    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && qualifyingEligible;
 
   const canContinueNonQualifying =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
@@ -212,7 +209,6 @@ export default function FHSAFlow() {
                     setSigned(false);
                     setQualifyingEligible(false);
                     setQualifyingData({});
-                    setConfirmChecked(false);
                     setOvpExcessAmount('');
                     setOvpSource(null);
                     setOvpRemovalMethod(null);
@@ -332,23 +328,6 @@ export default function FHSAFlow() {
                   withdrawalAmount={amount}
                   onWithdrawalAmountChange={setAmount}
                 />
-              </section>
-            </WizardSection>
-
-            {/* Qualifying confirmation checkbox */}
-            <WizardSection visible={isQualifying && qualifyingEligible}>
-              <section>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={confirmChecked}
-                    onChange={(e) => setConfirmChecked(e.target.checked)}
-                    className="mt-1 size-4 accent-qt-green cursor-pointer"
-                  />
-                  <span className="text-sm text-qt-primary leading-[22px]">
-                    I confirm that the information I've provided is true and accurate
-                  </span>
-                </label>
               </section>
             </WizardSection>
 

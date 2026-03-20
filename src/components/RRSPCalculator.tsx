@@ -68,57 +68,85 @@ export default function RRSPCalculator({ currency, onAmountChange, compact = fal
 
   if (compact) {
     return (
-      <div className="min-h-0">
-        <p className="text-xs font-semibold text-qt-primary mb-1">Calculator</p>
-        <div className="flex rounded-lg border border-qt-border overflow-hidden mb-1.5">
-          <button
-            type="button"
-            onClick={() => switchMode('gross')}
-            className={`flex-1 py-1 text-[11px] font-semibold transition-colors ${mode === 'gross' ? 'bg-qt-green text-white' : 'bg-white text-qt-primary'}`}
-          >
-            Gross
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode('net')}
-            className={`flex-1 py-1 text-[11px] font-semibold border-l border-qt-border transition-colors ${mode === 'net' ? 'bg-qt-green text-white' : 'bg-white text-qt-primary'}`}
-          >
-            Net
-          </button>
-        </div>
-        <div className="relative mb-1.5">
-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-qt-secondary text-xs">$</span>
-          <input
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={inputValue}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === '' || /^[0-9]*\.?[0-9]*$/.test(v)) {
-                handleInputChange(v);
-              }
-            }}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            className="w-full h-9 rounded-md border border-qt-gray-dark bg-white pl-7 pr-14 text-xs text-qt-primary placeholder:text-qt-secondary placeholder:italic outline-none focus:border-qt-green"
-          />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-qt-secondary">
-            {mode === 'gross' ? 'GROSS' : 'NET'} {currency}
-          </span>
-        </div>
-        {numericValue > 0 && (
-          <div className="border border-qt-border rounded-md overflow-hidden text-xs">
-            <div className="flex items-center justify-between px-2 py-0.5 bg-qt-bg-3 border-b border-qt-border">
-              <span className="text-[10px] font-bold uppercase text-qt-secondary">{currency}</span>
-            </div>
-            <CalcRow compact label="Gross" amount={grossAmount} currency={currency} />
-            <CalcRow compact label={`Tax (${rate}%)`} amount={-withholdingTax} currency={currency} negative tooltip="Questrade must make this tax payment to the CRA on your behalf" />
-            <div className="border-t border-qt-border">
-              <CalcRow compact label="Net" amount={netAmount} currency={currency} bold />
-            </div>
+      <div className="min-h-0 w-full max-w-[357px]">
+        <div className="overflow-hidden rounded-2xl border border-solid border-[var(--ads-color-secondary-400)] bg-[var(--ads-color-elevation-overlay)] px-4 py-4">
+          <p className="text-sm font-medium text-qt-secondary">Withdrawal calculator</p>
+          <div className="mt-3 flex overflow-hidden rounded-[length:var(--ads-border-radius-m)] border border-solid border-[var(--ads-color-secondary-400)]">
+            <button
+              type="button"
+              onClick={() => switchMode('gross')}
+              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
+                mode === 'gross'
+                  ? 'bg-qt-bg-3 text-qt-primary'
+                  : 'bg-[var(--ads-color-elevation-overlay)] text-qt-secondary'
+              }`}
+            >
+              Gross
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('net')}
+              className={`flex-1 border-l border-solid border-[var(--ads-color-secondary-400)] py-2.5 text-xs font-semibold transition-colors ${
+                mode === 'net'
+                  ? 'bg-qt-bg-3 text-qt-primary'
+                  : 'bg-[var(--ads-color-elevation-overlay)] text-qt-secondary'
+              }`}
+            >
+              Net
+            </button>
           </div>
-        )}
+          <div className="relative mt-3">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-qt-secondary tabular-nums">
+              $
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={inputValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '' || /^[0-9]*\.?[0-9]*$/.test(v)) {
+                  handleInputChange(v);
+                }
+              }}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              className="h-11 w-full rounded-[length:var(--ads-border-radius-m)] border border-solid border-[var(--ads-color-secondary-400)] bg-[var(--ads-color-elevation-overlay)] pl-8 pr-[4.5rem] text-sm font-semibold text-qt-primary outline-none transition-colors placeholder:italic placeholder:text-figma-neutral-200 focus:border-qt-green"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold tracking-wide text-qt-secondary">
+              {mode === 'gross' ? 'GROSS' : 'NET'} {currency}
+            </span>
+          </div>
+          {numericValue > 0 && (
+            <>
+              <div className="my-3 h-px w-full bg-figma-neutral-100" aria-hidden />
+              <div className="flex flex-col gap-2 text-[11px]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-qt-secondary">Gross</span>
+                  <span className="font-semibold tabular-nums text-qt-primary">
+                    {formatCurrency(grossAmount, currency)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1 font-medium text-qt-secondary">
+                    <span>Tax ({rate}%)</span>
+                    <Tooltip content="Questrade must make this tax payment to the CRA on your behalf" />
+                  </span>
+                  <span className="shrink-0 font-semibold tabular-nums text-qt-red">
+                    -{formatCurrency(Math.abs(withholdingTax), currency)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 border-t border-figma-neutral-100 pt-2">
+                  <span className="text-sm font-bold text-qt-primary">Net</span>
+                  <span className="text-sm font-bold tabular-nums text-qt-primary">
+                    {formatCurrency(netAmount, currency)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     );
   }

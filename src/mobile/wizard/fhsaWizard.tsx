@@ -63,8 +63,6 @@ export interface FhsaWizardCtx {
   setQualifyingEligible: (v: boolean) => void;
   qualifyingData: Record<string, unknown>;
   setQualifyingData: (d: Record<string, unknown>) => void;
-  confirmChecked: boolean;
-  setConfirmChecked: (v: boolean) => void;
   ovpExcessAmount: string;
   setOvpExcessAmount: (v: string) => void;
   ovpSource: 'cash' | 'rrsp' | 'both' | null;
@@ -84,7 +82,6 @@ export interface FhsaWizardCtx {
   fee: number;
   netAmount: number;
   withholdingTax: number;
-  canContinueQualifying: boolean;
   canContinueNonQualifying: boolean;
   canContinueOvercontribution: boolean;
   renderReviewSummary: () => ReactNode;
@@ -315,25 +312,6 @@ export function buildFhsaWizardSteps(): MobileWizardStepDef<FhsaWizardCtx>[] {
       ),
     },
     {
-      id: 'qualifying-confirm',
-      visible: (c) => c.isQualifying && c.qualifyingEligible,
-      canProceed: (c) => c.confirmChecked,
-      nextLabel: 'Continue',
-      render: (c) => (
-        <label className="flex items-start gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={c.confirmChecked}
-            onChange={(e) => c.setConfirmChecked(e.target.checked)}
-            className="mt-0.5 size-4 accent-qt-green cursor-pointer shrink-0"
-          />
-          <span className="text-xs text-qt-primary leading-snug">
-            I confirm the information I&apos;ve provided is true and accurate
-          </span>
-        </label>
-      ),
-    },
-    {
       id: 'ovp-intro',
       visible: (c) => c.isOvercontribution && c.bankReady,
       canProceed: () => true,
@@ -532,7 +510,13 @@ export function buildFhsaWizardSteps(): MobileWizardStepDef<FhsaWizardCtx>[] {
     {
       id: 'review',
       visible: (c) =>
-        (c.isQualifying && c.canContinueQualifying) ||
+        (c.isQualifying &&
+          !!c.currency &&
+          c.parsedAmount > 0 &&
+          !c.exceedsAvailable &&
+          !!c.method &&
+          c.bankReady &&
+          c.qualifyingEligible) ||
         (c.isNonQualifying && c.canContinueNonQualifying) ||
         (c.isOvercontribution && c.canContinueOvercontribution),
       canProceed: () => true,

@@ -112,6 +112,8 @@ export default function MobileStandardFlow() {
     return !!selectedBank;
   }, [account, method, intlWire.bankName, intlWire.swiftCode, selectedBank, signed]);
 
+  const step1Complete = parsedAmount > 0;
+
   const renderReviewSummary = useCallback(() => {
     if (!account) return null;
     return (
@@ -134,7 +136,7 @@ export default function MobileStandardFlow() {
           </>
         )}
         <div className="flex items-center justify-between gap-2 bg-qt-bg-3 px-3 py-3">
-          <p className="text-xs font-semibold text-qt-primary">Net to you</p>
+          <p className="text-xs font-semibold text-qt-primary">Withdrawal amount requested</p>
           <p className="text-sm font-semibold text-qt-green-dark tabular-nums">
             {formatCurrency(Math.max(0, netAmount), withdrawalCurrency)}
           </p>
@@ -156,17 +158,25 @@ export default function MobileStandardFlow() {
       setStep(1);
       return;
     }
-    if (step === 1) {
+    if (step === 1 && step1Complete) {
+      setAmount(parsedAmount > 0 ? parsedAmount.toFixed(2) : '');
+      setStep(2);
       return;
     }
     if (step === 2) {
       setSubmitted(true);
     }
-  }, [step, step0Complete]);
+  }, [step, step0Complete, step1Complete, parsedAmount]);
 
-  const primaryLabel = 'Next';
+  const primaryLabel = step === 2 ? 'Submit' : 'Next';
   const primaryDisabled =
-    step === 0 ? !step0Complete : step === 2 ? !account || netAmount < 0 : true;
+    step === 0
+      ? !step0Complete
+      : step === 1
+        ? !step1Complete
+        : step === 2
+          ? !account || netAmount < 0
+          : true;
 
   if (submitted && account) {
     return (
@@ -232,11 +242,7 @@ export default function MobileStandardFlow() {
         </div>
       </div>
 
-      <div
-        className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[length:var(--ads-size-xxs)] pt-2 ${
-          step === 1 ? 'pb-[max(1.25rem,env(safe-area-inset-bottom))]' : 'pb-4'
-        }`}
-      >
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[length:var(--ads-size-xxs)] pt-2 pb-4">
         {step === 0 && (
           <div className="flex flex-col gap-3">
             <p className="text-[11px] font-medium text-qt-primary">Tell us where to send your funds.</p>
@@ -311,10 +317,6 @@ export default function MobileStandardFlow() {
               combinedMaxInPrimary={withdrawalAmountStepData.combinedMaxInPrimary}
               amount={amount}
               onAmountChange={setAmount}
-              onContinue={(entered) => {
-                setAmount(entered > 0 ? entered.toFixed(2) : '');
-                setStep(2);
-              }}
             />
           </div>
         )}
@@ -329,21 +331,18 @@ export default function MobileStandardFlow() {
         )}
       </div>
 
-      {/* Step 1 uses in-flow Continue; other steps pin primary CTA here */}
-      {step !== 1 && (
-        <div className="shrink-0 px-[length:var(--ads-size-xxs)] pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <div className="mx-auto flex w-full max-w-[357px] flex-col">
-            <MobileButton
-              onClick={handlePrimary}
-              disabled={primaryDisabled}
-              fullWidth
-              className="!h-[length:var(--ads-size-xl)] !min-h-[length:var(--ads-size-xl)] !gap-[length:var(--ads-size-nano)] !rounded-[length:var(--ads-border-radius-xl)] !bg-[var(--ads-color-primary-500)] !px-[length:var(--ads-size-s)] !py-[length:var(--ads-size-quark)] !text-base text-white active:opacity-90"
-            >
-              {primaryLabel}
-            </MobileButton>
-          </div>
+      <div className="shrink-0 px-[length:var(--ads-size-xxs)] pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex w-full max-w-[357px] flex-col">
+          <MobileButton
+            onClick={handlePrimary}
+            disabled={primaryDisabled}
+            fullWidth
+            className="!h-[length:var(--ads-size-xl)] !min-h-[length:var(--ads-size-xl)] !gap-[length:var(--ads-size-nano)] !rounded-[length:var(--ads-border-radius-xl)] !bg-[var(--ads-color-primary-500)] !px-[length:var(--ads-size-s)] !py-[length:var(--ads-size-quark)] !text-base text-white active:opacity-90"
+          >
+            {primaryLabel}
+          </MobileButton>
         </div>
-      )}
+      </div>
     </div>
   );
 }

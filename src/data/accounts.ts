@@ -45,7 +45,7 @@ export const accounts: Account[] = [
     type: 'FHSA',
     label: 'Self-directed FHSA',
     accountNumber: '26958738',
-    balance: { cad: 8000.00, usd: 0 },
+    balance: { cad: 8000.00, usd: 3500.0 },
     currency: 'CAD',
   },
   {
