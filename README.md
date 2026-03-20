@@ -40,6 +40,8 @@ Vercel treats one Git branch as **Production** (often **`main`**). Pushes to any
 
 Also confirm **Settings → Git** shows this repo and the correct **root directory** (usually empty / repo root).
 
+If deployments still don’t appear, use **GitHub Actions** with Vercel tokens: see **`docs/VERCEL_DEPLOY.md`**.
+
 ---
 
 ## React + TypeScript + Vite (template notes)

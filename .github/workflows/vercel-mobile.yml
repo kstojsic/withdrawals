@@ -1,19 +1,31 @@
-# Optional: run manually from GitHub → Actions if you use token-based deploy.
-# With the repo connected in Vercel, pushes to `mobile` already trigger deployments.
-#
-# Secrets (repo → Settings → Secrets): VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+# Production deploy on push to `mobile`. Requires GitHub secrets (see docs/VERCEL_DEPLOY.md):
+# VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
 
-name: Deploy to Vercel (manual)
+name: Deploy to Vercel (mobile branch)
 
 on:
+  push:
+    branches:
+      - mobile
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Require Vercel secrets
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::error::Missing GitHub Actions secrets. Add VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID — see docs/VERCEL_DEPLOY.md"
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -24,9 +36,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Deploy to Vercel (production)
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: npx vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+      - name: Pull Vercel project settings
+        run: npx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Build (Vercel)
+        run: npx vercel build --prod --token="$VERCEL_TOKEN"
+
+      - name: Deploy to production
+        run: npx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
