@@ -186,6 +186,11 @@ export default function MobileFHSAFlow() {
     }
   }, []);
 
+  const handleNonQualGrossChange = useCallback((g: number) => {
+    setGrossAmount(g);
+    setAmount(g > 0 ? g.toFixed(2) : '');
+  }, []);
+
   const handleFhsaTypeChange = useCallback(
     (t: FHSAWithdrawalType) => {
       setFhsaType(t);
@@ -230,6 +235,9 @@ export default function MobileFHSAFlow() {
 
   const typeLabel = isQualifying ? 'Qualifying (Home Purchase)' : isNonQualifying ? 'Non-Qualifying' : 'Overcontribution';
 
+  const methodSummaryLabel = withdrawalMethodSummaryLabel(method);
+  const methodEta = withdrawalMethodEtaSummary(method);
+
   const renderReviewSummary = useCallback(() => {
     if (!account) return null;
     return (
@@ -263,13 +271,13 @@ export default function MobileFHSAFlow() {
           <>
             <SummaryRow label="Wire currency" value={intlWire.currency} />
             <SummaryRow label="Receiving bank" value={intlWire.bankName} />
-            {intlWire.bankCity.trim() ? <SummaryRow label="City" value={intlWire.bankCity} /> : null}
-            {intlWire.bankCountry.trim() ? <SummaryRow label="Country" value={intlWire.bankCountry} /> : null}
+            {intlWire.bankCity?.trim() ? <SummaryRow label="City" value={intlWire.bankCity} /> : null}
+            {intlWire.bankCountry?.trim() ? <SummaryRow label="Country" value={intlWire.bankCountry} /> : null}
             <SummaryRow label="SWIFT / BIC" value={intlWire.swiftCode} />
-            {intlWire.bankAccountNumber.trim() ? (
+            {intlWire.bankAccountNumber?.trim() ? (
               <SummaryRow label="Account / IBAN" value={intlWire.bankAccountNumber} />
             ) : null}
-            {intlWire.routingNumber.trim() ? <SummaryRow label="Routing number" value={intlWire.routingNumber} /> : null}
+            {intlWire.routingNumber?.trim() ? <SummaryRow label="Routing number" value={intlWire.routingNumber} /> : null}
             {intlWire.hasIntermediary ? (
               <SummaryRow
                 label="Intermediary bank"
@@ -343,6 +351,8 @@ export default function MobileFHSAFlow() {
     isQualifying,
     qualifyingEligible,
     method,
+    methodEta,
+    methodSummaryLabel,
     netAmount,
     ovpExcessAmount,
     parsedAmount,
@@ -536,14 +546,7 @@ export default function MobileFHSAFlow() {
                   maxFromSecondaryInPrimary={withdrawalAmountStepData.maxFromSecondaryInPrimary}
                   combinedMaxInPrimary={withdrawalAmountStepData.combinedMaxInPrimary}
                 />
-                <RRSPCalculator
-                  compact
-                  currency={withdrawalCurrency}
-                  onAmountChange={(g) => {
-                    setGrossAmount(g);
-                    setAmount(g > 0 ? g.toFixed(2) : '');
-                  }}
-                />
+                <RRSPCalculator compact currency={withdrawalCurrency} onAmountChange={handleNonQualGrossChange} />
                 {grossAmount > 0 && (
                   <div className="rounded-lg bg-qt-bg-3 px-3 py-2">
                     <p className="text-[10px] text-qt-secondary">Withdrawal amount (gross)</p>

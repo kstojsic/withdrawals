@@ -8,12 +8,12 @@ import {
   getWithholdingRate,
   grossFromNet,
 } from '../data/accounts';
+import RadioButton from './RadioButton';
+import Tooltip from './Tooltip';
 
 function withdrawalCurrencyPrefix(currency: Currency): string {
   return currency === 'USD' ? 'US$' : 'CA$';
 }
-import RadioButton from './RadioButton';
-import Tooltip from './Tooltip';
 
 interface RRSPCalculatorProps {
   currency: Currency;
