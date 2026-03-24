@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useLinkedBankWithdrawalRules } from '../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, ChevronDown } from 'lucide-react';
 import Tooltip from '../components/Tooltip';
@@ -7,7 +8,7 @@ import BalanceCard from '../components/BalanceCard';
 import CurrencySelector from '../components/CurrencySelector';
 import CurrencyInput from '../components/CurrencyInput';
 import MethodSelector from '../components/MethodSelector';
-import BankSelector from '../components/BankSelector';
+import BankDepositDropdown from '../components/BankDepositDropdown';
 import InternationalWireForm from '../components/InternationalWireForm';
 import RRSPCalculator from '../components/RRSPCalculator';
 import HBPEligibility from '../components/HBPEligibility';
@@ -17,7 +18,15 @@ import ESignature from '../components/ESignature';
 import Button from '../components/Button';
 import InfoBox from '../components/InfoBox';
 import WizardSection from '../components/WizardSection';
-import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
+import {
+  accounts,
+  linkedBanks as defaultBanks,
+  formatCurrency,
+  FX_RATE,
+  FX_BUFFER,
+  getLinkedBankDepositCurrency,
+} from '../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, RRSPWithdrawalType } from '../types';
 
 const rrspOptions: { value: RRSPWithdrawalType; label: string; badge?: string }[] = [
@@ -29,8 +38,7 @@ const rrspOptions: { value: RRSPWithdrawalType; label: string; badge?: string }[
 
 export default function RRSPFlow() {
   const navigate = useNavigate();
-  const rrspAccounts = accounts.filter((a) => a.type === 'RRSP');
-  const [account, setAccount] = useState<Account | null>(rrspAccounts[0] || null);
+  const [account, setAccount] = useState<Account | null>(null);
 
   const [rrspType, setRrspType] = useState<RRSPWithdrawalType | ''>('');
   const [currency, setCurrency] = useState<Currency | null>(null);
@@ -54,6 +62,7 @@ export default function RRSPFlow() {
   });
   const [signed, setSigned] = useState(false);
   const [hbpEligible, setHbpEligible] = useState<boolean | null>(null);
+  const [hbpNonResidentIneligible, setHbpNonResidentIneligible] = useState(false);
   const [llpEligible, setLlpEligible] = useState(false);
   const [llpData, setLlpData] = useState<Record<string, unknown>>({});
   const [ovpFormMailed, setOvpFormMailed] = useState(false);
@@ -61,6 +70,20 @@ export default function RRSPFlow() {
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const { methodDisabled, bank: linkedBank } = useLinkedBankWithdrawalRules(
+    allBanks,
+    selectedBank,
+    setMethod,
+    setIntlWire,
+  );
+
+  /** Settlement / deposit currency for fees and method copy (matches Standard & mobile). */
+  const withdrawalCurrency = useMemo(() => {
+    if (method === 'international_wire') return intlWire.currency;
+    if (linkedBank) return getLinkedBankDepositCurrency(linkedBank);
+    return currency;
+  }, [method, intlWire.currency, linkedBank, currency]);
 
   function handleAccountChange(acct: Account) {
     if (acct.type === 'FHSA') {
@@ -76,23 +99,30 @@ export default function RRSPFlow() {
       return;
     }
     setAccount(acct);
-    resetForm();
+    setRrspType('');
+    resetWithdrawalDetails();
   }
 
-  function resetForm() {
-    setRrspType('');
+  function resetWithdrawalDetails() {
     setCurrency(null);
     setAmount('');
-    setMethod(null);
-    setSelectedBank(null);
     setGrossAmount(0);
     setHbpEligible(null);
+    setHbpNonResidentIneligible(false);
     setLlpEligible(false);
     setLlpData({});
     setOvpFormMailed(false);
     setSigned(false);
     setConfirmChecked(false);
     setShowSummary(false);
+    setAddress({ street: '', city: '', province: '', postalCode: '' });
+  }
+
+  function resetForm() {
+    setRrspType('');
+    resetWithdrawalDetails();
+    setMethod(null);
+    setSelectedBank(null);
   }
 
   const cadAvailable = account ? account.balance.cad : 0;
@@ -104,7 +134,12 @@ export default function RRSPFlow() {
   const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
   const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
   const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
-  const fee = method === 'wire' ? (currency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
+  const fee =
+    method === 'wire'
+      ? (withdrawalCurrency === 'USD' ? 30 : 20)
+      : method === 'international_wire'
+        ? 40
+        : 0;
 
   const isDeregistration = rrspType === 'deregistration';
   const isHBP = rrspType === 'hbp';
@@ -115,17 +150,34 @@ export default function RRSPFlow() {
   const llpYearlyMax = currency === 'USD' ? 10000 / FX_RATE : 10000;
   const llpLifetimeMax = currency === 'USD' ? 20000 / FX_RATE : 20000;
 
-  const bankReady = method === 'international_wire'
-    ? intlWire.bankName && intlWire.swiftCode
-    : selectedBank;
+  const bankReady =
+    method === 'international_wire'
+      ? !!(selectedBank && intlWire.bankName && intlWire.swiftCode && signed)
+      : !!selectedBank;
 
   const canContinueDeregistration = currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
   const canContinueHBP =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && confirmChecked &&
-    hbpEligible === true && address.street && address.city && signed;
+    currency &&
+    parsedAmount > 0 &&
+    !exceedsAvailable &&
+    method &&
+    bankReady &&
+    !hbpNonResidentIneligible &&
+    confirmChecked &&
+    ((hbpEligible === true &&
+      !!address.street &&
+      !!address.city &&
+      (method === 'international_wire' || signed)) ||
+      hbpEligible === false);
   const canContinueLLP =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && confirmChecked &&
-    llpEligible && signed;
+    currency &&
+    parsedAmount > 0 &&
+    !exceedsAvailable &&
+    method &&
+    bankReady &&
+    confirmChecked &&
+    llpEligible &&
+    (method === 'international_wire' || signed);
   
 
   function handleSubmit() {
@@ -181,53 +233,20 @@ export default function RRSPFlow() {
               </section>
             </WizardSection>
 
-            {/* Withdrawal Type */}
+            {/* Withdrawal type — same step order as FHSA (after account + balance) */}
             <WizardSection visible={!!account}>
               <section>
                 <WithdrawalTypeDropdown
                   value={rrspType}
                   onChange={(v) => {
+                    resetWithdrawalDetails();
                     setRrspType(v);
-                    setCurrency(null);
-                    setAmount('');
-                    setMethod(null);
-                    setSelectedBank(null);
-                    setGrossAmount(0);
-                    setHbpEligible(null);
-                    setLlpEligible(false);
-                    setLlpData({});
-                    setOvpFormMailed(false);
-                    setSigned(false);
-                    setConfirmChecked(false);
                   }}
                 />
               </section>
             </WizardSection>
 
-            {/* HBP max info */}
-            <WizardSection visible={isHBP}>
-              <InfoBox>
-                <p>
-                  Under the Home Buyers' Plan, you can withdraw a maximum of <strong>{formatCurrency(hbpMax, currency || 'CAD')}</strong> from
-                  your RRSP to buy or build a qualifying home.
-                  {currency === 'USD' && <span className="text-qt-secondary"> (equivalent to $60,000 CAD)</span>}
-                </p>
-              </InfoBox>
-            </WizardSection>
-
-            {/* LLP max info */}
-            <WizardSection visible={isLLP}>
-              <InfoBox>
-                <p>
-                  Under the Lifelong Learning Plan, you can withdraw a maximum of <strong>{formatCurrency(llpLifetimeMax, currency || 'CAD')}</strong> total
-                  and up to <strong>{formatCurrency(llpYearlyMax, currency || 'CAD')}</strong> within a calendar year from your RRSP to finance
-                  full-time education or training for you or your spouse.
-                  {currency === 'USD' && <span className="text-qt-secondary"> (equivalent to $20,000 / $10,000 CAD)</span>}
-                </p>
-              </InfoBox>
-            </WizardSection>
-
-            {/* Currency Selection - combined amounts */}
+            {/* Currency — matches FHSA: choose withdrawal currency after withdrawal type */}
             <WizardSection visible={!!rrspType && !isOvercontribution}>
               <section>
                 <CurrencySelector
@@ -237,6 +256,28 @@ export default function RRSPFlow() {
                   usdAmount={combinedUsd}
                 />
               </section>
+            </WizardSection>
+
+            {/* HBP / LLP plan limits — after currency, like contextual help on FHSA flows */}
+            <WizardSection visible={isHBP && !!currency}>
+              <InfoBox>
+                <p>
+                  Under the Home Buyers' Plan, you can withdraw a maximum of <strong>{formatCurrency(hbpMax, currency || 'CAD')}</strong> from
+                  your RRSP to buy or build a qualifying home.
+                  {currency === 'USD' && <span className="text-qt-secondary"> (equivalent to $60,000 CAD)</span>}
+                </p>
+              </InfoBox>
+            </WizardSection>
+
+            <WizardSection visible={isLLP && !!currency}>
+              <InfoBox>
+                <p>
+                  Under the Lifelong Learning Plan, you can withdraw a maximum of <strong>{formatCurrency(llpLifetimeMax, currency || 'CAD')}</strong> total
+                  and up to <strong>{formatCurrency(llpYearlyMax, currency || 'CAD')}</strong> within a calendar year from your RRSP to finance
+                  full-time education or training for you or your spouse.
+                  {currency === 'USD' && <span className="text-qt-secondary"> (equivalent to $20,000 / $10,000 CAD)</span>}
+                </p>
+              </InfoBox>
             </WizardSection>
 
             {/* Deregistration: Calculator + withdrawal amount */}
@@ -266,6 +307,11 @@ export default function RRSPFlow() {
                         Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.
                       </p>
                     )}
+                    {currency && !exceedsAvailable && (
+                      <p className="text-xs text-qt-secondary mt-2">
+                        Available: {formatCurrency(maxAmount, currency)}
+                      </p>
+                    )}
                   </div>
                 )}
               </section>
@@ -282,6 +328,11 @@ export default function RRSPFlow() {
                   maxLabel={formatCurrency(hbpMax, currency || 'CAD')}
                   error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
                 />
+                {currency && !exceedsAvailable && (
+                  <p className="text-xs text-qt-secondary mt-1">
+                    Available: {formatCurrency(maxAmount, currency)}
+                  </p>
+                )}
                 {triggersConversion && (
                   <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
                     <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
@@ -347,6 +398,11 @@ export default function RRSPFlow() {
                   maxLabel={`${formatCurrency(llpYearlyMax, currency || 'CAD')} per calendar year`}
                   error={exceedsAvailable ? `Amount exceeds available balance of ${formatCurrency(maxAmount, currency!)}` : undefined}
                 />
+                {currency && !exceedsAvailable && (
+                  <p className="text-xs text-qt-secondary mt-1">
+                    Available: {formatCurrency(maxAmount, currency)}
+                  </p>
+                )}
                 {triggersConversion && (
                   <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
                     <p className="text-sm text-amber-800">Your request exceeds your {currency} balance. An automatic currency conversion will be applied to cover the difference.</p>
@@ -355,21 +411,26 @@ export default function RRSPFlow() {
               </section>
             </WizardSection>
 
-            {/* Method */}
+            {/* Deposit bank — dropdown (same pattern as FHSA) */}
             <WizardSection visible={!isOvercontribution && parsedAmount > 0 && !exceedsAvailable}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-              </section>
-            </WizardSection>
-
-            {/* Bank (EFT or Wire) */}
-            <WizardSection visible={!!method && method !== 'international_wire'}>
-              <section>
-                <BankSelector
+                <BankDepositDropdown
                   value={selectedBank}
                   onChange={setSelectedBank}
                   allBanks={allBanks}
                   onBanksChange={setAllBanks}
+                />
+              </section>
+            </WizardSection>
+
+            {/* Method */}
+            <WizardSection visible={!isOvercontribution && parsedAmount > 0 && !exceedsAvailable && !!selectedBank}>
+              <section>
+                <MethodSelector
+                  value={method}
+                  onChange={setMethod}
+                  currency={withdrawalCurrency}
+                  methodDisabled={methodDisabled}
                 />
               </section>
             </WizardSection>
@@ -398,7 +459,12 @@ export default function RRSPFlow() {
                     The CRA requires a completed T1036 form to process a Home Buyers' Plan withdrawal. We've simplified this by turning the form into a short questionnaire — once you're done, we'll generate a pre-filled T1036 that you can download from the summary page.
                   </p>
                 </div>
-                <HBPEligibility onEligibilityChange={setHbpEligible} />
+                <HBPEligibility
+                  onEligibilityChange={(elig, meta) => {
+                    setHbpEligible(elig);
+                    setHbpNonResidentIneligible(!!meta?.nonResidentIneligible);
+                  }}
+                />
               </section>
             </WizardSection>
 
@@ -422,6 +488,32 @@ export default function RRSPFlow() {
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input type="checkbox" checked={confirmChecked} onChange={(e) => setConfirmChecked(e.target.checked)}
                       className="mt-1 size-4 accent-qt-green cursor-pointer" />
+                    <span className="text-sm font-semibold text-qt-primary leading-[22px]">I agree</span>
+                  </label>
+                </div>
+              </section>
+            </WizardSection>
+
+            {/* HBP: not eligible after questionnaire — acknowledge and continue (non-resident is blocked earlier) */}
+            <WizardSection visible={isHBP && hbpEligible === false && !hbpNonResidentIneligible}>
+              <section className="flex flex-col gap-6">
+                <InfoBox variant="warning">
+                  <p className="text-sm text-qt-primary leading-[22px]">
+                    Based on your answers, you do not appear to be eligible for the Home Buyers&apos; Plan. You can still
+                    continue if you want this withdrawal processed for review.
+                  </p>
+                </InfoBox>
+                <div className="border border-qt-border rounded-lg p-5 bg-qt-bg-3">
+                  <p className="text-sm text-qt-primary leading-[22px] mb-4">
+                    I understand the above and want to continue with my withdrawal request.
+                  </p>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={confirmChecked}
+                      onChange={(e) => setConfirmChecked(e.target.checked)}
+                      className="mt-1 size-4 accent-qt-green cursor-pointer"
+                    />
                     <span className="text-sm font-semibold text-qt-primary leading-[22px]">I agree</span>
                   </label>
                 </div>
@@ -469,9 +561,9 @@ export default function RRSPFlow() {
             {/* LLP E-sign + confirmation */}
             <WizardSection visible={isLLP && llpEligible}>
               <section className="flex flex-col gap-6">
-                {method !== 'international_wire' && (
+                {method !== 'international_wire' ? (
                   <ESignature onSign={() => setSigned(true)} signed={signed} />
-                )}
+                ) : null}
                 <div className="border border-qt-border rounded-lg p-5 bg-qt-bg-3">
                   <p className="text-sm text-qt-primary leading-[22px] mb-4">
                     I certify that the information I've provided is correct and complete, and I authorize this withdrawal from my RRSP.
@@ -522,6 +614,9 @@ export default function RRSPFlow() {
       ? `${llpData.spouseFirstName || ''} ${llpData.spouseLastName || ''}`.trim()
       : `${llpData.firstName || 'Anastasia'} ${llpData.lastName || 'Carmichael'} (You)`;
 
+    const methodSummaryLabel = withdrawalMethodSummaryLabel(method);
+    const methodEta = withdrawalMethodEtaSummary(method);
+
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto" onClick={() => setShowSummary(false)}>
         <div className="w-full max-w-[680px] mx-auto bg-white rounded-2xl shadow-2xl my-10" onClick={(e) => e.stopPropagation()}>
@@ -533,7 +628,7 @@ export default function RRSPFlow() {
           </div>
           <div className="px-6 py-6">
 
-            {isHBP && (
+            {isHBP && hbpEligible === true && (
               <div className="bg-white border border-qt-border rounded-lg divide-y divide-qt-border mb-6">
                 <SummaryRow label="Legal name" value="Anastasia Carmichael" />
                 <SummaryRow label="Address of qualifying home" value={`${address.street}, ${address.city}, ${address.province} ${address.postalCode}`} />
@@ -555,18 +650,44 @@ export default function RRSPFlow() {
               {isDeregistration && (
                 <SummaryRow label="Withholding tax" value={`-${formatCurrency(withholdingTax, currency || 'CAD')}`} tooltip="Questrade must make this tax payment to the CRA on your behalf" />
               )}
-              <SummaryRow
-                label="Method"
-                value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire Transfer' : 'International Wire'}
-              />
+              <SummaryRow label="Method" value={methodSummaryLabel} />
+              {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
               {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, currency || 'CAD')}`} />}
               {method !== 'international_wire' && bank && (
-                <SummaryRow label="Bank" value={`${bank.name} - ****${bank.last4}`} />
+                <SummaryRow
+                  label="Deposit bank"
+                  value={`${bank.name} - ****${bank.last4} (${getLinkedBankDepositCurrency(bank)})`}
+                />
               )}
               {method === 'international_wire' && (
                 <>
-                  <SummaryRow label="International bank" value={intlWire.bankName} />
-                  <SummaryRow label="SWIFT code" value={intlWire.swiftCode} />
+                  <SummaryRow label="Wire currency" value={intlWire.currency} />
+                  <SummaryRow label="Receiving bank" value={intlWire.bankName} />
+                  {intlWire.bankCity.trim() ? (
+                    <SummaryRow label="City" value={intlWire.bankCity} />
+                  ) : null}
+                  {intlWire.bankCountry.trim() ? (
+                    <SummaryRow label="Country" value={intlWire.bankCountry} />
+                  ) : null}
+                  <SummaryRow label="SWIFT / BIC" value={intlWire.swiftCode} />
+                  {intlWire.bankAccountNumber.trim() ? (
+                    <SummaryRow label="Account / IBAN" value={intlWire.bankAccountNumber} />
+                  ) : null}
+                  {intlWire.routingNumber.trim() ? (
+                    <SummaryRow label="Routing number" value={intlWire.routingNumber} />
+                  ) : null}
+                  {intlWire.hasIntermediary ? (
+                    <SummaryRow
+                      label="Intermediary bank"
+                      value={
+                        [intlWire.intermediaryBankName, intlWire.intermediarySwiftCode].filter(Boolean).join(' · ') ||
+                        'Yes'
+                      }
+                    />
+                  ) : null}
+                  {intlWire.isBrokerage ? (
+                    <SummaryRow label="Brokerage" value={intlWire.brokerageName || 'Yes'} />
+                  ) : null}
                 </>
               )}
               <div className="flex items-center justify-between px-5 py-4 bg-qt-bg-3">

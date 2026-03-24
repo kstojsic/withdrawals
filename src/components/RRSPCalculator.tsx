@@ -1,6 +1,17 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Currency } from '../types';
-import { formatCurrency, formatAmountDisplay, stripFormatting, calculateWithholdingTax, getWithholdingRate, grossFromNet } from '../data/accounts';
+import {
+  formatCurrency,
+  formatAmountDisplay,
+  stripFormatting,
+  calculateWithholdingTax,
+  getWithholdingRate,
+  grossFromNet,
+} from '../data/accounts';
+
+function withdrawalCurrencyPrefix(currency: Currency): string {
+  return currency === 'USD' ? 'US$' : 'CA$';
+}
 import RadioButton from './RadioButton';
 import Tooltip from './Tooltip';
 
@@ -95,13 +106,18 @@ export default function RRSPCalculator({ currency, onAmountChange, compact = fal
               Net
             </button>
           </div>
-          <div className="relative mt-3">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-qt-secondary tabular-nums">
-              $
+          <div
+            className={`mt-3 flex min-h-[48px] items-center gap-2 rounded-[length:var(--ads-border-radius-m)] border border-solid bg-[var(--ads-color-elevation-overlay)] px-3 transition-colors ${
+              focused ? 'border-qt-green' : 'border-[var(--ads-color-secondary-400)]'
+            }`}
+          >
+            <span className="text-base font-medium text-qt-secondary tabular-nums" aria-hidden>
+              {withdrawalCurrencyPrefix(currency)}
             </span>
             <input
               type="text"
               inputMode="decimal"
+              autoComplete="off"
               placeholder="0.00"
               value={inputValue}
               onChange={(e) => {
@@ -112,9 +128,9 @@ export default function RRSPCalculator({ currency, onAmountChange, compact = fal
               }}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              className="h-11 w-full rounded-[length:var(--ads-border-radius-m)] border border-solid border-[var(--ads-color-secondary-400)] bg-[var(--ads-color-elevation-overlay)] pl-8 pr-[4.5rem] text-sm font-semibold text-qt-primary outline-none transition-colors placeholder:italic placeholder:text-figma-neutral-200 focus:border-qt-green"
+              className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[18px] font-semibold leading-6 text-qt-primary outline-none placeholder:italic placeholder:text-qt-border tabular-nums"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold tracking-wide text-qt-secondary">
+            <span className="shrink-0 text-[10px] font-semibold tracking-wide text-qt-secondary">
               {mode === 'gross' ? 'GROSS' : 'NET'} {currency}
             </span>
           </div>

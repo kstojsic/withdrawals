@@ -26,6 +26,7 @@ export default function LinkBankModal({ onClose, onSave }: LinkBankModalProps) {
       transitNumber: transit,
       accountNumber: accountNum,
       last4: accountNum.slice(-4),
+      institutionCountry: 'CA',
     };
     onSave(newBank);
   }

@@ -1,16 +1,27 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useLinkedBankWithdrawalRules } from '../../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, Download } from 'lucide-react';
-import WizardShell from '../components/WizardShell';
+import { CheckCircle2, ChevronLeft, Download } from 'lucide-react';
 import MobileButton from '../components/MobileButton';
+import MobileThreeStepProgress from '../components/MobileThreeStepProgress';
 import { useWizardNavigation } from '../wizard/useWizardNavigation';
-import { buildRrspWizardSteps, getRrspWizardShellProgress, type RrspWizardCtx } from '../wizard/rrspWizard';
-import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../../data/accounts';
+import { buildRrspWizardSteps, getRrspMacroStep, type RrspWizardCtx } from '../wizard/rrspWizard';
+import {
+  accounts,
+  linkedBanks as defaultBanks,
+  formatCurrency,
+  FX_RATE,
+  getLinkedBankDepositCurrency,
+  getWithdrawalAmountStepData,
+} from '../../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, RRSPWithdrawalType } from '../../types';
+
+const STEP_TITLES = ['Account information', 'Withdrawal Details', 'Review and Confirm'] as const;
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between px-3 py-2 gap-2">
+    <div className="flex items-center justify-between gap-2 px-3 py-2.5">
       <p className="text-xs text-qt-secondary shrink-0">{label}</p>
       <p className="text-xs font-semibold text-qt-primary text-right max-w-[58%] break-words">{value}</p>
     </div>
@@ -22,10 +33,9 @@ export default function MobileRRSPFlow() {
   const [account, setAccount] = useState<Account | null>(() => accounts.find((a) => a.type === 'RRSP') ?? null);
 
   const [rrspType, setRrspType] = useState<RRSPWithdrawalType | ''>('');
-  const [currency, setCurrency] = useState<Currency | null>(null);
   const [grossAmount, setGrossAmount] = useState(0);
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<WithdrawalMethod | null>(null);
+  const [method, setMethod] = useState<WithdrawalMethod>('eft');
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [allBanks, setAllBanks] = useState<LinkedBank[]>(defaultBanks);
   const [intlWire, setIntlWire] = useState<InternationalWireData>({
@@ -41,46 +51,56 @@ export default function MobileRRSPFlow() {
   });
   const [signed, setSigned] = useState(false);
   const [hbpEligible, setHbpEligible] = useState<boolean | null>(null);
+  const [hbpNonResidentIneligible, setHbpNonResidentIneligible] = useState(false);
   const [llpEligible, setLlpEligible] = useState(false);
   const [llpData, setLlpData] = useState<Record<string, unknown>>({});
   const [address, setAddress] = useState({ street: '', city: '', province: '', postalCode: '' });
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [depositBankFromNewLink, setDepositBankFromNewLink] = useState(false);
 
   const wizardSteps = useMemo(() => buildRrspWizardSteps(), []);
 
-  const showWithdrawalCurrency = !selectedBank || depositBankFromNewLink;
+  const { methodDisabled, bank } = useLinkedBankWithdrawalRules(allBanks, selectedBank, setMethod, setIntlWire);
 
-  const onDepositBankSelectionKind = useCallback((kind: 'existing' | 'newly_linked') => {
-    if (kind === 'existing') {
-      setDepositBankFromNewLink(false);
-      setCurrency('CAD');
-      setAmount('');
-      setGrossAmount(0);
-    } else {
-      setDepositBankFromNewLink(true);
-      setCurrency(null);
-      setAmount('');
-      setGrossAmount(0);
-    }
-  }, []);
+  const withdrawalCurrency: Currency = useMemo(() => {
+    if (method === 'international_wire') return intlWire.currency;
+    return getLinkedBankDepositCurrency(bank);
+  }, [method, intlWire.currency, bank]);
 
-  const resetForm = useCallback(() => {
-    setRrspType('');
-    setCurrency(null);
+  const withdrawalAmountStepData = useMemo(
+    () => (account ? getWithdrawalAmountStepData(account, withdrawalCurrency) : null),
+    [account, withdrawalCurrency],
+  );
+
+  const resetWithdrawalDetails = useCallback(() => {
     setAmount('');
-    setMethod(null);
-    setSelectedBank(null);
-    setDepositBankFromNewLink(false);
     setGrossAmount(0);
     setHbpEligible(null);
+    setHbpNonResidentIneligible(false);
     setLlpEligible(false);
     setLlpData({});
     setSigned(false);
     setConfirmChecked(false);
     setAddress({ street: '', city: '', province: '', postalCode: '' });
   }, []);
+
+  const resetForm = useCallback(() => {
+    setRrspType('');
+    resetWithdrawalDetails();
+    setMethod('eft');
+    setSelectedBank(null);
+    setIntlWire({
+      firstName: 'Anastasia', lastName: 'Carmichael',
+      currency: 'CAD', amount: '', reason: '',
+      bankName: '', bankAddress: '', bankCity: '', bankCountry: '',
+      swiftCode: '', bankAccountNumber: '',
+      hasIntermediary: false, intermediaryBankName: '',
+      intermediarySwiftCode: '', intermediaryAccountNumber: '',
+      routingNumber: '',
+      isBrokerage: false, brokerageName: '',
+      brokerageAccountName: '', brokerageAccountNumber: '',
+    });
+  }, [resetWithdrawalDetails]);
 
   const handleAccountChange = useCallback(
     (acct: Account) => {
@@ -97,60 +117,68 @@ export default function MobileRRSPFlow() {
         return;
       }
       setAccount(acct);
-      resetForm();
+      setRrspType('');
+      resetWithdrawalDetails();
     },
-    [navigate, resetForm],
+    [navigate, resetWithdrawalDetails],
   );
-
-  const cadAvailable = account ? account.balance.cad : 0;
-  const usdAvailable = account ? account.balance.usd : 0;
-  const combinedCad = cadAvailable + usdAvailable * FX_RATE * (1 - FX_BUFFER);
-  const combinedUsd = cadAvailable / FX_RATE * (1 - FX_BUFFER) + usdAvailable;
-  const maxAmount = currency === 'CAD' ? combinedCad : currency === 'USD' ? combinedUsd : 0;
-  const parsedAmount = parseFloat(amount) || 0;
-  const exceedsAvailable = parsedAmount > maxAmount && parsedAmount > 0;
-  const singleCurrencyBalance = currency === 'CAD' ? cadAvailable : currency === 'USD' ? usdAvailable : 0;
-  const triggersConversion = parsedAmount > singleCurrencyBalance && !exceedsAvailable && parsedAmount > 0;
-  const fee = method === 'wire' ? (currency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
 
   const isDeregistration = rrspType === 'deregistration';
   const isHBP = rrspType === 'hbp';
   const isLLP = rrspType === 'llp';
   const isOvercontribution = rrspType === 'overcontribution';
 
-  const hbpMax = currency === 'USD' ? 60000 / FX_RATE : 60000;
-  const llpYearlyMax = currency === 'USD' ? 10000 / FX_RATE : 10000;
-  const llpLifetimeMax = currency === 'USD' ? 20000 / FX_RATE : 20000;
+  const maxAmount = withdrawalAmountStepData?.combinedMaxInPrimary ?? 0;
+  const parsedAmount = parseFloat(amount) || 0;
+  const activeAmount = isDeregistration ? grossAmount : parsedAmount;
+  const exceedsAvailable = activeAmount > maxAmount && activeAmount > 0;
+  const singleCurrencyBalance = withdrawalAmountStepData?.availableBalance ?? 0;
+  const triggersConversion =
+    !isDeregistration &&
+    parsedAmount > singleCurrencyBalance &&
+    !exceedsAvailable &&
+    parsedAmount > 0;
+  const fee =
+    method === 'wire' ? (withdrawalCurrency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
+
+  const hbpMax = withdrawalCurrency === 'USD' ? 60000 / FX_RATE : 60000;
+  const llpYearlyMax = withdrawalCurrency === 'USD' ? 10000 / FX_RATE : 10000;
+  const llpLifetimeMax = withdrawalCurrency === 'USD' ? 20000 / FX_RATE : 20000;
 
   const bankReady =
     method === 'international_wire'
-      ? !!(intlWire.bankName && intlWire.swiftCode)
+      ? !!(
+          selectedBank &&
+          intlWire.bankName?.trim() &&
+          intlWire.swiftCode?.trim() &&
+          signed
+        )
       : !!selectedBank;
 
+  const taxBase = isDeregistration ? grossAmount : parsedAmount;
   const withholdingTax = isDeregistration
-    ? parsedAmount <= 5000
-      ? parsedAmount * 0.1
-      : parsedAmount <= 15000
-        ? parsedAmount * 0.2
-        : parsedAmount * 0.3
+    ? taxBase <= 5000
+      ? taxBase * 0.1
+      : taxBase <= 15000
+        ? taxBase * 0.2
+        : taxBase * 0.3
     : 0;
-  const net = parsedAmount - withholdingTax - fee;
+  const net = taxBase - withholdingTax - fee;
 
   const canContinueDeregistration =
-    !!currency && parsedAmount > 0 && !exceedsAvailable && !!method && !!bankReady;
+    grossAmount > 0 && !exceedsAvailable && !!method && !!bankReady;
   const canContinueHBP =
-    !!currency &&
     parsedAmount > 0 &&
     !exceedsAvailable &&
     !!method &&
     !!bankReady &&
     confirmChecked &&
-    hbpEligible === true &&
-    !!address.street &&
-    !!address.city &&
-    (method === 'international_wire' || signed);
+    ((hbpEligible === true &&
+      !!address.street &&
+      !!address.city &&
+      (method === 'international_wire' || signed)) ||
+      hbpEligible === false);
   const canContinueLLP =
-    !!currency &&
     parsedAmount > 0 &&
     !exceedsAvailable &&
     !!method &&
@@ -158,8 +186,6 @@ export default function MobileRRSPFlow() {
     confirmChecked &&
     llpEligible &&
     (method === 'international_wire' || signed);
-
-  const bank = allBanks.find((b) => b.id === selectedBank);
 
   const withdrawalTypeLabel = isHBP
     ? "Home Buyer's Plan"
@@ -176,9 +202,12 @@ export default function MobileRRSPFlow() {
 
   const renderReviewSummary = useCallback(() => {
     if (!account) return null;
+    const methodSummaryLabel = withdrawalMethodSummaryLabel(method);
+    const methodEta = withdrawalMethodEtaSummary(method);
+    const reviewAmount = isDeregistration ? grossAmount : parsedAmount;
     return (
       <>
-        {isHBP && (
+        {isHBP && hbpEligible === true && (
           <>
             <SummaryRow label="Legal name" value="Anastasia Carmichael" />
             <SummaryRow
@@ -195,17 +224,15 @@ export default function MobileRRSPFlow() {
         )}
         <SummaryRow label="Account" value={`${account.label} - ${account.accountNumber}`} />
         <SummaryRow label="Withdrawal type" value={withdrawalTypeLabel} />
-        <SummaryRow label="Currency" value={currency || ''} />
-        <SummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, currency || 'CAD')} />
+        <SummaryRow label="Currency" value={withdrawalCurrency} />
+        <SummaryRow label="Withdrawal amount" value={formatCurrency(reviewAmount, withdrawalCurrency)} />
         {isDeregistration && (
-          <SummaryRow label="Withholding tax" value={`-${formatCurrency(withholdingTax, currency || 'CAD')}`} />
+          <SummaryRow label="Withholding tax" value={`-${formatCurrency(withholdingTax, withdrawalCurrency)}`} />
         )}
         {(isHBP || isLLP) && <SummaryRow label="Withholding tax" value="$0.00" />}
-        <SummaryRow
-          label="Method"
-          value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire Transfer' : 'International Wire'}
-        />
-        {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, currency || 'CAD')}`} />}
+        <SummaryRow label="Method" value={methodSummaryLabel} />
+        {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
+        {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, withdrawalCurrency)}`} />}
         {method !== 'international_wire' && bank && (
           <SummaryRow label="Bank" value={`${bank.name} - ****${bank.last4}`} />
         )}
@@ -217,7 +244,7 @@ export default function MobileRRSPFlow() {
         )}
         <div className="flex items-center justify-between px-4 py-4 bg-qt-bg-3">
           <p className="font-semibold text-base text-qt-primary">Net amount</p>
-          <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), currency || 'CAD')}</p>
+          <p className="font-semibold text-lg text-qt-green-dark">{formatCurrency(Math.max(0, net), withdrawalCurrency)}</p>
         </div>
         <div className="px-4 py-4">
           <p className="text-xs font-semibold text-qt-secondary uppercase tracking-wider mb-2">Forms</p>
@@ -250,8 +277,9 @@ export default function MobileRRSPFlow() {
     address.province,
     address.street,
     bank,
-    currency,
     fee,
+    grossAmount,
+    hbpEligible,
     intlWire.bankName,
     intlWire.swiftCode,
     isDeregistration,
@@ -262,6 +290,7 @@ export default function MobileRRSPFlow() {
     net,
     parsedAmount,
     withholdingTax,
+    withdrawalCurrency,
     withdrawalTypeLabel,
   ]);
 
@@ -272,17 +301,16 @@ export default function MobileRRSPFlow() {
       onAccountChange: handleAccountChange,
       onNavigateHome: () => navigate('/'),
       resetForm,
+      resetWithdrawalDetails,
       rrspType,
       setRrspType,
       isDeregistration,
       isHBP,
       isLLP,
       isOvercontribution,
-      combinedCad,
-      combinedUsd,
       maxAmount,
-      currency,
-      setCurrency,
+      currency: withdrawalCurrency,
+      withdrawalAmountStepData,
       amount,
       setAmount,
       grossAmount,
@@ -299,8 +327,6 @@ export default function MobileRRSPFlow() {
       setSelectedBank,
       allBanks,
       setAllBanks,
-      showWithdrawalCurrency,
-      onDepositBankSelectionKind,
       intlWire,
       setIntlWire,
       signed,
@@ -308,6 +334,8 @@ export default function MobileRRSPFlow() {
       bankReady,
       hbpEligible,
       setHbpEligible,
+      hbpNonResidentIneligible,
+      setHbpNonResidentIneligible,
       address,
       setAddress,
       llpEligible,
@@ -323,6 +351,7 @@ export default function MobileRRSPFlow() {
       canContinueHBP,
       canContinueLLP,
       renderReviewSummary,
+      methodDisabled,
     }),
     [
       account,
@@ -333,15 +362,13 @@ export default function MobileRRSPFlow() {
       canContinueDeregistration,
       canContinueHBP,
       canContinueLLP,
-      combinedCad,
-      combinedUsd,
       confirmChecked,
-      currency,
       exceedsAvailable,
       fee,
       grossAmount,
       handleAccountChange,
       hbpEligible,
+      hbpNonResidentIneligible,
       hbpMax,
       intlWire,
       isDeregistration,
@@ -354,18 +381,20 @@ export default function MobileRRSPFlow() {
       llpYearlyMax,
       maxAmount,
       method,
+      methodDisabled,
       navigate,
       net,
-      onDepositBankSelectionKind,
       parsedAmount,
       renderReviewSummary,
       resetForm,
+      resetWithdrawalDetails,
       rrspType,
       selectedBank,
-      showWithdrawalCurrency,
       signed,
       triggersConversion,
       withholdingTax,
+      withdrawalAmountStepData,
+      withdrawalCurrency,
     ],
   );
 
@@ -382,12 +411,7 @@ export default function MobileRRSPFlow() {
     typeof current?.nextLabel === 'function' ? current.nextLabel(ctx) : current?.nextLabel ?? 'Continue';
   const canProceed = current ? current.canProceed(ctx) : false;
 
-  const shellProgress = useMemo(() => {
-    if (!current) {
-      return { stepIndex: 0, totalSteps: Math.max(1, wizardSteps.length - 3) };
-    }
-    return getRrspWizardShellProgress(wizardSteps, current.id);
-  }, [wizardSteps, current]);
+  const macroStep = current ? getRrspMacroStep(current.id) : 0;
 
   const handlePrimary = useCallback(() => {
     if (!current) return;
@@ -439,19 +463,44 @@ export default function MobileRRSPFlow() {
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 h-full w-full overflow-hidden">
-      <WizardShell
-        stepIndex={shellProgress.stepIndex}
-        totalSteps={shellProgress.totalSteps}
-        showBack={nav.stepIndex > 0}
-        onBack={nav.goBack}
-        onPrimary={handlePrimary}
-        primaryLabel={primaryLabel}
-        primaryDisabled={!canProceed}
-        hideFooter={!!current.hideFooter}
-      >
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
+      <div className="relative shrink-0">
+        {nav.stepIndex > 0 && (
+          <button
+            type="button"
+            onClick={nav.goBack}
+            className="absolute left-[length:var(--ads-size-xxs)] top-3 z-10 flex size-9 items-center justify-center rounded-full text-[var(--ads-color-body-contrast-100)] active:bg-qt-bg-3 cursor-pointer"
+            aria-label="Back"
+          >
+            <ChevronLeft className="size-[18px]" strokeWidth={2.25} aria-hidden />
+          </button>
+        )}
+        <div className="flex flex-col items-start gap-[length:var(--ads-size-xxxs)] self-stretch px-[length:var(--ads-size-xxs)] pb-2 pt-2">
+          <h1 className="w-full text-center font-[family-name:var(--ads-font-family-body)] text-[length:var(--ads-font-size-s)] font-semibold leading-[length:var(--ads-font-line-height-s)] text-[var(--ads-color-body-contrast-100)]">
+            {STEP_TITLES[macroStep]}
+          </h1>
+          <MobileThreeStepProgress step={macroStep} />
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[length:var(--ads-size-xxs)] pt-2 pb-4">
         {current.render(ctx)}
-      </WizardShell>
+      </div>
+
+      {!current.hideFooter && (
+        <div className="shrink-0 px-[length:var(--ads-size-xxs)] pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex w-full max-w-[357px] flex-col">
+            <MobileButton
+              onClick={handlePrimary}
+              disabled={!canProceed}
+              fullWidth
+              className="!h-[length:var(--ads-size-xl)] !min-h-[length:var(--ads-size-xl)] !gap-[length:var(--ads-size-nano)] !rounded-[length:var(--ads-border-radius-xl)] !bg-[var(--ads-color-primary-500)] !px-[length:var(--ads-size-s)] !py-[length:var(--ads-size-quark)] !text-base text-white active:opacity-90"
+            >
+              {primaryLabel}
+            </MobileButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

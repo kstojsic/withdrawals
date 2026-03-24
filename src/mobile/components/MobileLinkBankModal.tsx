@@ -28,6 +28,7 @@ export default function MobileLinkBankModal({ onClose, onSave }: MobileLinkBankM
       accountNumber: accountNum,
       last4: accountNum.slice(-4),
       depositCurrency,
+      institutionCountry: 'CA',
     };
     onSave(newBank);
   }

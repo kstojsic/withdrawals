@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useLinkedBankWithdrawalRules } from '../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import AccountDropdown from '../components/AccountDropdown';
@@ -12,6 +13,7 @@ import ESignature from '../components/ESignature';
 import Button from '../components/Button';
 import WizardSection from '../components/WizardSection';
 import { linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData } from '../types';
 
 export default function StandardFlow() {
@@ -40,6 +42,8 @@ export default function StandardFlow() {
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const { methodDisabled } = useLinkedBankWithdrawalRules(allBanks, selectedBank, setMethod, setIntlWire);
 
   function handleAccountChange(acct: Account) {
     if (acct.type === 'RRSP') {
@@ -79,8 +83,9 @@ export default function StandardFlow() {
     currency &&
     parsedAmount > 0 &&
     !exceedsAvailable &&
+    selectedBank &&
     method &&
-    (method === 'international_wire' ? intlWire.bankName && intlWire.swiftCode : selectedBank);
+    (method === 'international_wire' ? intlWire.bankName && intlWire.swiftCode : true);
 
   function handleSubmit() {
     setSubmitted(true);
@@ -131,7 +136,8 @@ export default function StandardFlow() {
               <SummaryRow label="Account" value={`${account.label} - ${account.accountNumber}`} />
               <SummaryRow label="Currency" value={currency || ''} />
               <SummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, currency || 'CAD')} />
-              <SummaryRow label="Method" value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire Transfer' : 'International Wire'} />
+              <SummaryRow label="Method" value={methodSummaryLabel} />
+              {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
               {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, currency || 'CAD')}`} />}
               {method !== 'international_wire' && bank && (
                 <SummaryRow label="Bank" value={`${bank.name} - ****${bank.last4}`} />
@@ -140,7 +146,6 @@ export default function StandardFlow() {
                 <>
                   <SummaryRow label="International bank" value={intlWire.bankName} />
                   <SummaryRow label="SWIFT code" value={intlWire.swiftCode} />
-                  {intlWire.reason && <SummaryRow label="Reason" value={intlWire.reason} />}
                 </>
               )}
               <div className="flex items-center justify-between px-5 py-4 bg-qt-bg-3">
@@ -221,21 +226,26 @@ export default function StandardFlow() {
               </section>
             </WizardSection>
 
-            {/* Method */}
+            {/* Deposit bank (linked account) — before method so options reflect country/currency */}
             <WizardSection visible={parsedAmount > 0 && !exceedsAvailable}>
-              <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-              </section>
-            </WizardSection>
-
-            {/* Bank (EFT or Wire) */}
-            <WizardSection visible={!!method && method !== 'international_wire'}>
               <section>
                 <BankSelector
                   value={selectedBank}
                   onChange={setSelectedBank}
                   allBanks={allBanks}
                   onBanksChange={setAllBanks}
+                />
+              </section>
+            </WizardSection>
+
+            {/* Method */}
+            <WizardSection visible={parsedAmount > 0 && !exceedsAvailable && !!selectedBank}>
+              <section>
+                <MethodSelector
+                  value={method}
+                  onChange={setMethod}
+                  currency={currency}
+                  methodDisabled={methodDisabled}
                 />
               </section>
             </WizardSection>

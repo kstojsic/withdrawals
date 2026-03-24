@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { WithdrawalMethod, Currency } from '../../types';
+import type { WithdrawalMethodDisableFlags } from '../../data/accounts';
 
 function feeHint(method: WithdrawalMethod, currency: Currency | null): string {
-  if (method === 'eft') return 'No fee · 0–3 business days';
+  if (method === 'eft') return 'No fee · 0–2 business days';
   if (method === 'wire') return `${currency === 'USD' ? '$30' : '$20'} fee · 1–2 business days`;
   return '$40 fee · 2+ business days';
 }
@@ -20,16 +21,25 @@ const triggerBase =
 const panelShell =
   'z-30 flex h-[220px] w-full max-w-[357px] flex-col overflow-hidden rounded-[length:var(--ads-border-radius-m)] border border-solid border-[var(--ads-color-secondary-400)] bg-[var(--ads-color-elevation-overlay)] pt-3 pl-4 shadow-[0_8px_24px_rgba(38,45,51,0.12)] animate-[fadeSlideIn_0.15s_ease-out]';
 
+const defaultDisabled: WithdrawalMethodDisableFlags = {
+  eft: false,
+  wire: false,
+  international_wire: false,
+};
+
 interface MobileWithdrawalMethodDropdownProps {
   value: WithdrawalMethod;
   onChange: (m: WithdrawalMethod) => void;
   currencyHint?: Currency | null;
+  /** Grey out and block selection for methods not allowed for this deposit bank. */
+  methodDisabled?: WithdrawalMethodDisableFlags;
 }
 
 export default function MobileWithdrawalMethodDropdown({
   value,
   onChange,
   currencyHint = 'CAD',
+  methodDisabled = defaultDisabled,
 }: MobileWithdrawalMethodDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -77,21 +87,33 @@ export default function MobileWithdrawalMethodDropdown({
           <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1 pb-5">
             {METHODS.map((m) => {
               const isSelected = value === m.value;
+              const disabled = methodDisabled[m.value];
               return (
                 <button
                   key={m.value}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
+                  aria-disabled={disabled}
+                  disabled={disabled}
                   onClick={() => {
+                    if (disabled) return;
                     onChange(m.value);
                     setOpen(false);
                   }}
-                  className={`flex w-full shrink-0 flex-col items-start gap-0.5 py-2 text-left transition-colors active:bg-qt-bg-3 ${
-                    isSelected ? 'bg-qt-green-bg/70' : 'hover:bg-qt-bg-2'
+                  className={`flex w-full shrink-0 flex-col items-start gap-0.5 py-2 text-left transition-colors ${
+                    disabled
+                      ? 'cursor-not-allowed opacity-45'
+                      : isSelected
+                        ? 'bg-qt-green-bg/70 active:bg-qt-bg-3'
+                        : 'hover:bg-qt-bg-2 active:bg-qt-bg-3'
                   }`}
                 >
-                  <span className="text-sm font-bold leading-snug text-[var(--ads-color-body-contrast-100)]">
+                  <span
+                    className={`text-sm font-bold leading-snug ${
+                      disabled ? 'text-figma-neutral-200' : 'text-[var(--ads-color-body-contrast-100)]'
+                    }`}
+                  >
                     {m.label}
                   </span>
                   <span className="text-xs font-normal leading-snug text-figma-neutral-200">

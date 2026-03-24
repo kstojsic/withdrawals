@@ -49,8 +49,10 @@ const initialState: HBPState = {
   sep_acquireInterestBeforeWithdrawal: null,
 };
 
+export type HBPEligibilityMeta = { nonResidentIneligible?: boolean };
+
 interface HBPEligibilityProps {
-  onEligibilityChange: (eligible: boolean | null) => void;
+  onEligibilityChange: (eligible: boolean | null, meta?: HBPEligibilityMeta) => void;
   onAnswersChange?: (answers: HBPState) => void;
 }
 
@@ -88,13 +90,20 @@ export default function HBPEligibility({ onEligibilityChange, onAnswersChange }:
   const eligibility = computeEligibility(s);
 
   useEffect(() => {
-    onEligibilityChange(eligibility);
+    if (s.residentOfCanada === 'no') {
+      onEligibilityChange(false, { nonResidentIneligible: true });
+    } else {
+      onEligibilityChange(eligibility, { nonResidentIneligible: false });
+    }
     onAnswersChange?.(s);
-  }, [s]);
+  }, [s, eligibility]);
 
-  const g1Terminal = s.residentOfCanada === 'no' || s.writtenAgreement === 'no';
-  const g1Done = s.residentOfCanada === 'yes' && s.writtenAgreement === 'yes'
-    && (s.personWithDisability === 'yes' || s.disabledPersonPurchase !== null);
+  const g1Terminal = s.residentOfCanada === 'yes' && s.writtenAgreement === 'no';
+  /** Group 2+ only after Canadian residency confirmed and group 1 fully answered. */
+  const g1Done =
+    s.residentOfCanada === 'yes' &&
+    s.writtenAgreement === 'yes' &&
+    (s.personWithDisability === 'yes' || s.disabledPersonPurchase !== null);
 
   const g2Terminal = s.previousHBP === 'yes' && s.repaymentBalanceZero === 'no';
   const g2Done = g1Done && !g1Terminal && (s.previousHBP === 'no' || s.repaymentBalanceZero === 'yes');
@@ -120,7 +129,9 @@ export default function HBPEligibility({ onEligibilityChange, onAnswersChange }:
             onChange={(v) => set('residentOfCanada', v)}
           />
 
-          {s.residentOfCanada === 'no' && <NotEligible reason="You must be a resident of Canada to participate in the Home Buyers' Plan." />}
+          {s.residentOfCanada === 'no' && (
+            <NotEligible reason="The Home Buyers' Plan is only available to residents of Canada. You are not eligible for this HBP withdrawal." />
+          )}
 
           {s.residentOfCanada === 'yes' && (
             <>
@@ -361,11 +372,11 @@ function computeEligibility(s: HBPState): boolean | null {
     if (s.livingSeparate90Days === 'no') return false;
     if (s.newSpouseOwnsHome === 'yes') return false;
     if (s.newSpouseOwnsHome === 'no') {
-      if (s.ownOccupyPrincipalResidence === 'no') return true;
+      if (s.ownOccupyPrincipalResidence === 'no') return s.residentOfCanada === 'yes';
       if (s.ownOccupyPrincipalResidence === 'yes') {
-        if (s.differentFromPrincipal === 'yes') return true;
+        if (s.differentFromPrincipal === 'yes') return s.residentOfCanada === 'yes';
         if (s.differentFromPrincipal === 'no') {
-          if (s.acquireInterestBeforeWithdrawal === 'yes') return true;
+          if (s.acquireInterestBeforeWithdrawal === 'yes') return s.residentOfCanada === 'yes';
           if (s.acquireInterestBeforeWithdrawal === 'no') return false;
         }
       }
@@ -374,16 +385,16 @@ function computeEligibility(s: HBPState): boolean | null {
   }
 
   if (s.ownedQualifyingHome30Days === 'no') {
-    if (s.ownedHomeBetween2022_2026 === 'no') return true;
+    if (s.ownedHomeBetween2022_2026 === 'no') return s.residentOfCanada === 'yes';
     if (s.ownedHomeBetween2022_2026 === 'yes') {
       if (s.sep_livingSeparate90Days === 'no') return false;
       if (s.sep_newSpouseOwnsHome === 'yes') return false;
       if (s.sep_newSpouseOwnsHome === 'no') {
-        if (s.sep_ownOccupyPrincipalResidence === 'no') return true;
+        if (s.sep_ownOccupyPrincipalResidence === 'no') return s.residentOfCanada === 'yes';
         if (s.sep_ownOccupyPrincipalResidence === 'yes') {
-          if (s.sep_differentFromPrincipal === 'yes') return true;
+          if (s.sep_differentFromPrincipal === 'yes') return s.residentOfCanada === 'yes';
           if (s.sep_differentFromPrincipal === 'no') {
-            if (s.sep_acquireInterestBeforeWithdrawal === 'yes') return true;
+            if (s.sep_acquireInterestBeforeWithdrawal === 'yes') return s.residentOfCanada === 'yes';
             if (s.sep_acquireInterestBeforeWithdrawal === 'no') return false;
           }
         }

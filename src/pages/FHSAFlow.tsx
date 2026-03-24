@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useLinkedBankWithdrawalRules } from '../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, ChevronDown } from 'lucide-react';
 import Tooltip from '../components/Tooltip';
@@ -7,7 +8,7 @@ import BalanceCard from '../components/BalanceCard';
 import CurrencySelector from '../components/CurrencySelector';
 import CurrencyInput from '../components/CurrencyInput';
 import MethodSelector from '../components/MethodSelector';
-import BankSelector from '../components/BankSelector';
+import BankDepositDropdown from '../components/BankDepositDropdown';
 import InternationalWireForm from '../components/InternationalWireForm';
 import RRSPCalculator from '../components/RRSPCalculator';
 import FHSAEligibility from '../components/FHSAEligibility';
@@ -17,6 +18,7 @@ import InfoBox from '../components/InfoBox';
 import RadioButton from '../components/RadioButton';
 import WizardSection from '../components/WizardSection';
 import { accounts, linkedBanks as defaultBanks, formatCurrency, formatAmountDisplay, stripFormatting, FX_RATE, FX_BUFFER } from '../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, FHSAWithdrawalType } from '../types';
 
 const fhsaOptions: { value: FHSAWithdrawalType; label: string; badge?: string }[] = [
@@ -52,6 +54,7 @@ export default function FHSAFlow() {
   });
   const [signed, setSigned] = useState(false);
   const [qualifyingEligible, setQualifyingEligible] = useState(false);
+  const [qualifyingQuestionnaireComplete, setQualifyingQuestionnaireComplete] = useState(false);
   const [qualifyingData, setQualifyingData] = useState<Record<string, unknown>>({});
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -64,6 +67,8 @@ export default function FHSAFlow() {
   const [ovpTaxUnderstood, setOvpTaxUnderstood] = useState(false);
   const [ovpAgreed, setOvpAgreed] = useState(false);
   const [ovpSigned, setOvpSigned] = useState(false);
+
+  const { methodDisabled } = useLinkedBankWithdrawalRules(allBanks, selectedBank, setMethod, setIntlWire);
 
   function handleAccountChange(acct: Account) {
     if (acct.type !== 'FHSA') {
@@ -85,6 +90,7 @@ export default function FHSAFlow() {
     setSelectedBank(null);
     setSigned(false);
     setQualifyingEligible(false);
+    setQualifyingQuestionnaireComplete(false);
     setQualifyingData({});
     setShowSummary(false);
     setOvpExcessAmount('');
@@ -111,12 +117,18 @@ export default function FHSAFlow() {
   const isNonQualifying = fhsaType === 'non_qualifying';
   const isOvercontribution = fhsaType === 'overcontribution';
 
-  const bankReady = method === 'international_wire'
-    ? intlWire.bankName && intlWire.swiftCode
-    : selectedBank;
+  const bankReady =
+    method === 'international_wire'
+      ? !!(selectedBank && intlWire.bankName && intlWire.swiftCode && signed)
+      : !!selectedBank;
 
   const canContinueQualifying =
-    currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady && qualifyingEligible;
+    currency &&
+    parsedAmount > 0 &&
+    !exceedsAvailable &&
+    method &&
+    bankReady &&
+    (qualifyingEligible || qualifyingQuestionnaireComplete);
 
   const canContinueNonQualifying =
     currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady;
@@ -208,6 +220,7 @@ export default function FHSAFlow() {
                     setSelectedBank(null);
                     setSigned(false);
                     setQualifyingEligible(false);
+                    setQualifyingQuestionnaireComplete(false);
                     setQualifyingData({});
                     setOvpExcessAmount('');
                     setOvpSource(null);
@@ -280,21 +293,26 @@ export default function FHSAFlow() {
               </section>
             </WizardSection>
 
-            {/* Method */}
+            {/* Deposit bank (linked account) */}
             <WizardSection visible={parsedAmount > 0 && !exceedsAvailable}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-              </section>
-            </WizardSection>
-
-            {/* Bank (EFT or Wire) */}
-            <WizardSection visible={!!method && method !== 'international_wire'}>
-              <section>
-                <BankSelector
+                <BankDepositDropdown
                   value={selectedBank}
                   onChange={setSelectedBank}
                   allBanks={allBanks}
                   onBanksChange={setAllBanks}
+                />
+              </section>
+            </WizardSection>
+
+            {/* Method */}
+            <WizardSection visible={parsedAmount > 0 && !exceedsAvailable && !!selectedBank}>
+              <section>
+                <MethodSelector
+                  value={method}
+                  onChange={setMethod}
+                  currency={currency}
+                  methodDisabled={methodDisabled}
                 />
               </section>
             </WizardSection>
@@ -324,7 +342,11 @@ export default function FHSAFlow() {
                   </p>
                 </div>
                 <FHSAEligibility
-                  onComplete={(elig, data) => { setQualifyingEligible(elig); setQualifyingData(data as unknown as Record<string, unknown>); }}
+                  onComplete={(elig, data) => {
+                    setQualifyingEligible(elig);
+                    setQualifyingData(data as unknown as Record<string, unknown>);
+                  }}
+                  onQuestionnaireComplete={setQualifyingQuestionnaireComplete}
                   withdrawalAmount={amount}
                   onWithdrawalAmountChange={setAmount}
                 />
@@ -527,9 +549,12 @@ export default function FHSAFlow() {
   function renderSummary() {
     if (!account) return null;
     const bank = allBanks.find((b) => b.id === selectedBank);
-    const withholdingTax = isNonQualifying
-      ? (parsedAmount <= 5000 ? parsedAmount * 0.1 : parsedAmount <= 15000 ? parsedAmount * 0.2 : parsedAmount * 0.3)
-      : 0;
+    const scheduleWithholding = (amt: number) =>
+      amt <= 5000 ? amt * 0.1 : amt <= 15000 ? amt * 0.2 : amt * 0.3;
+    const withholdingTax =
+      isNonQualifying || (isQualifying && !qualifyingEligible)
+        ? scheduleWithholding(parsedAmount)
+        : 0;
     const net = parsedAmount - withholdingTax - fee;
 
     const typeLabel = isQualifying
@@ -537,6 +562,9 @@ export default function FHSAFlow() {
       : isNonQualifying
         ? 'Non-Qualifying'
         : 'Overcontribution';
+
+    const methodSummaryLabel = withdrawalMethodSummaryLabel(method);
+    const methodEta = withdrawalMethodEtaSummary(method);
 
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto" onClick={() => setShowSummary(false)}>
@@ -564,16 +592,14 @@ export default function FHSAFlow() {
               <SummaryRow label="Withdrawal type" value={typeLabel} />
               <SummaryRow label="Currency" value={currency || ''} />
               <SummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, currency || 'CAD')} />
-              {isNonQualifying && (
+              {(isNonQualifying || (isQualifying && !qualifyingEligible)) && withholdingTax > 0 && (
                 <SummaryRow label="Withholding tax" value={`-${formatCurrency(withholdingTax, currency || 'CAD')}`} tooltip="Questrade must make this tax payment to the CRA on your behalf" />
               )}
-              {isQualifying && (
+              {isQualifying && qualifyingEligible && (
                 <SummaryRow label="Withholding tax" value="$0.00 (Tax-free)" />
               )}
-              <SummaryRow
-                label="Method"
-                value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire Transfer' : 'International Wire'}
-              />
+              <SummaryRow label="Method" value={methodSummaryLabel} />
+              {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
               {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, currency || 'CAD')}`} />}
               {method !== 'international_wire' && bank && (
                 <SummaryRow label="Bank" value={`${bank.name} - ****${bank.last4}`} />

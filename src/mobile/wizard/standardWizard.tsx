@@ -7,7 +7,6 @@ import MobileCurrencyInput from '../components/MobileCurrencyInput';
 import MobileMethodSelector from '../components/MobileMethodSelector';
 import MobileBankSelector from '../components/MobileBankSelector';
 import MobileInternationalWireForm from '../components/MobileInternationalWireForm';
-import MobileESignature from '../components/MobileESignature';
 import MobileAmountStepLayout from '../components/MobileAmountStepLayout';
 import { formatCurrency } from '../../data/accounts';
 
@@ -158,8 +157,9 @@ export function buildStandardWizardSteps(): MobileWizardStepDef<StandardWizardCt
                 amount={c.amount}
                 data={c.intlWire}
                 onChange={c.setIntlWire}
+                signed={c.signed}
+                onSign={() => c.setSigned(true)}
               />
-              <MobileESignature onSign={() => c.setSigned(true)} signed={c.signed} />
             </>
           ) : (
             <MobileBankSelector

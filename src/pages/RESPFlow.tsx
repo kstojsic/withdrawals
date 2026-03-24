@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
+import { useLinkedBankWithdrawalRules } from '../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, ChevronDown, Upload, X } from 'lucide-react';
 import Tooltip from '../components/Tooltip';
@@ -16,6 +17,7 @@ import InfoBox from '../components/InfoBox';
 import QuestionGroup from '../components/QuestionGroup';
 import WizardSection from '../components/WizardSection';
 import { accounts, linkedBanks as defaultBanks, formatCurrency, FX_RATE, FX_BUFFER } from '../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, RESPWithdrawalType } from '../types';
 
 const respOptions: { value: RESPWithdrawalType; label: string }[] = [
@@ -53,6 +55,8 @@ export default function RESPFlow() {
   const [confirmChecked, setConfirmChecked] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const { methodDisabled } = useLinkedBankWithdrawalRules(allBanks, selectedBank, setMethod, setIntlWire);
 
   // EAP & PSE questionnaire state
   const [beneficiary, setBeneficiary] = useState<string | null>(null);
@@ -154,8 +158,7 @@ export default function RESPFlow() {
     resetAIP();
   }
 
-  function resetAIP() {
-    setAipResident(null);
+  function resetAipQuestionnaire() {
     setAipChoice(null);
     setAipProvince('');
     setAipTotalAIP('');
@@ -172,6 +175,11 @@ export default function RESPFlow() {
     setAipPriorTransfers(null);
     setAipPriorTransferAmount('');
     setAipCloseAck(false);
+  }
+
+  function resetAIP() {
+    setAipResident(null);
+    resetAipQuestionnaire();
   }
 
   const bd = account?.respBreakdown;
@@ -228,9 +236,11 @@ export default function RESPFlow() {
   const singleContribBalance = currency === 'CAD' ? contribCad : currency === 'USD' ? contribUsd : 0;
   const capTriggersConversion = capParsedAmount > singleContribBalance && !capExceedsAvailable && capParsedAmount > 0;
 
-  const bankReady = method === 'international_wire'
-    ? intlWire.bankName && intlWire.swiftCode
-    : selectedBank;
+  /** Intl: exclude `signed` here — RESP EAP/Capital/AIP collect subscriber signatures after this gate. */
+  const bankReady =
+    method === 'international_wire'
+      ? !!(selectedBank && intlWire.bankName && intlWire.swiftCode)
+      : !!selectedBank;
 
   const selectedBeneficiary = account?.respBeneficiaries?.find((b) => b.id === beneficiary) || null;
   const hasJoint = !!account?.jointSubscriber;
@@ -306,9 +316,17 @@ export default function RESPFlow() {
     (aipPriorTransfers !== null);
 
   const canContinueAIP =
-    isAIP && currency && parsedAmount > 0 && !exceedsAvailable && method && bankReady &&
-    aipResident === 'yes' && (aipWithdrawalReady || aipRolloverReady) &&
-    aipCloseAck && signaturesReady && confirmChecked;
+    isAIP &&
+    currency &&
+    parsedAmount > 0 &&
+    !exceedsAvailable &&
+    method &&
+    bankReady &&
+    (aipResident === 'yes' || aipResident === 'no') &&
+    (aipWithdrawalReady || aipRolloverReady) &&
+    aipCloseAck &&
+    signaturesReady &&
+    confirmChecked;
 
   function handleSubmit() {
     setSubmitted(true);
@@ -684,18 +702,24 @@ export default function RESPFlow() {
 
                     {fundsRecipient && consentReady && (
                       <div className="animate-[fadeSlideIn_0.3s_ease-out]">
-                        <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">Payment method</p>
-                        <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-                      </div>
-                    )}
-
-                    {fundsRecipient && consentReady && method && method !== 'international_wire' && (
-                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">Deposit account</p>
                         <BankSelector value={selectedBank} onChange={setSelectedBank} allBanks={allBanks} onBanksChange={setAllBanks} />
                       </div>
                     )}
 
-                    {fundsRecipient && consentReady && method === 'international_wire' && (
+                    {fundsRecipient && consentReady && selectedBank && (
+                      <div className="animate-[fadeSlideIn_0.3s_ease-out]">
+                        <p className="text-sm text-qt-primary leading-[22px] mb-2 font-semibold">Payment method</p>
+                        <MethodSelector
+                          value={method}
+                          onChange={setMethod}
+                          currency={currency}
+                          methodDisabled={methodDisabled}
+                        />
+                      </div>
+                    )}
+
+                    {fundsRecipient && consentReady && selectedBank && method === 'international_wire' && (
                       <div className="animate-[fadeSlideIn_0.3s_ease-out]">
                         <InternationalWireForm currency={currency || 'CAD'} amount={amount} data={intlWire} onChange={setIntlWire} />
                       </div>
@@ -804,21 +828,26 @@ export default function RESPFlow() {
               </section>
             </WizardSection>
 
-            {/* Capital Method */}
+            {/* Capital deposit bank */}
             <WizardSection visible={isCapital && parsedAmount > 0 && !exceedsAvailable}>
-              <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
-              </section>
-            </WizardSection>
-
-            {/* Capital Bank */}
-            <WizardSection visible={isCapital && !!method && method !== 'international_wire'}>
               <section>
                 <BankSelector
                   value={selectedBank}
                   onChange={setSelectedBank}
                   allBanks={allBanks}
                   onBanksChange={setAllBanks}
+                />
+              </section>
+            </WizardSection>
+
+            {/* Capital method */}
+            <WizardSection visible={isCapital && parsedAmount > 0 && !exceedsAvailable && !!selectedBank}>
+              <section>
+                <MethodSelector
+                  value={method}
+                  onChange={setMethod}
+                  currency={currency}
+                  methodDisabled={methodDisabled}
                 />
               </section>
             </WizardSection>
@@ -1052,13 +1081,18 @@ export default function RESPFlow() {
 
             <WizardSection visible={isAIP && parsedAmount > 0 && parsedAmount <= aipMaxAmount}>
               <section>
-                <MethodSelector value={method} onChange={(m) => { setMethod(m); setSelectedBank(null); }} currency={currency} />
+                <BankSelector value={selectedBank} onChange={setSelectedBank} allBanks={allBanks} onBanksChange={setAllBanks} />
               </section>
             </WizardSection>
 
-            <WizardSection visible={isAIP && !!method && method !== 'international_wire'}>
+            <WizardSection visible={isAIP && parsedAmount > 0 && parsedAmount <= aipMaxAmount && !!selectedBank}>
               <section>
-                <BankSelector value={selectedBank} onChange={setSelectedBank} allBanks={allBanks} onBanksChange={setAllBanks} />
+                <MethodSelector
+                  value={method}
+                  onChange={setMethod}
+                  currency={currency}
+                  methodDisabled={methodDisabled}
+                />
               </section>
             </WizardSection>
 
@@ -1088,20 +1122,41 @@ export default function RESPFlow() {
                 <div className="animate-[fadeSlideIn_0.3s_ease-out]">
                   <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">Are you currently a resident of Canada?</p>
                   <div className="flex gap-6">
-                    <RadioButton name="aip-resident" value="yes" label="Yes" checked={aipResident === 'yes'} onChange={() => { setAipResident('yes'); setAipChoice(null); resetAIP(); setAipResident('yes'); }} />
-                    <RadioButton name="aip-resident" value="no" label="No" checked={aipResident === 'no'} onChange={() => setAipResident('no')} />
+                    <RadioButton
+                      name="aip-resident"
+                      value="yes"
+                      label="Yes"
+                      checked={aipResident === 'yes'}
+                      onChange={() => {
+                        resetAIP();
+                        setAipResident('yes');
+                      }}
+                    />
+                    <RadioButton
+                      name="aip-resident"
+                      value="no"
+                      label="No"
+                      checked={aipResident === 'no'}
+                      onChange={() => {
+                        setAipResident('no');
+                        resetAipQuestionnaire();
+                      }}
+                    />
                   </div>
                   {aipResident === 'no' && (
                     <div className="mt-3 animate-[fadeSlideIn_0.3s_ease-out]">
-                      <InfoBox variant="error">
-                        <p><strong>Not eligible.</strong> Subscribers who are not residents of Canada are ineligible for an Accumulated Income Payment (AIP).</p>
+                      <InfoBox variant="warning">
+                        <p>
+                          <strong>Note.</strong> AIP rules generally apply to Canadian residents. You can still complete this
+                          section so we can capture your intent; eligibility will be confirmed during processing.
+                        </p>
                       </InfoBox>
                     </div>
                   )}
                 </div>
 
                 {/* AIP Choice */}
-                {aipResident === 'yes' && (
+                {(aipResident === 'yes' || aipResident === 'no') && (
                   <div className="animate-[fadeSlideIn_0.3s_ease-out]">
                     <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">What would you like to do with the accumulated income (growth) in your RESP?</p>
                     <div className="flex flex-col gap-3">
@@ -1408,6 +1463,9 @@ export default function RESPFlow() {
       : isCapital ? 'QT Capital Withdrawal form'
       : 'QT RESP Withdrawal form';
 
+    const methodSummaryLabel = withdrawalMethodSummaryLabel(method);
+    const methodEta = withdrawalMethodEtaSummary(method);
+
     return (
       <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 overflow-y-auto" onClick={() => setShowSummary(false)}>
         <div className="w-full max-w-[680px] mx-auto bg-white rounded-2xl shadow-2xl my-10" onClick={(e) => e.stopPropagation()}>
@@ -1486,10 +1544,8 @@ export default function RESPFlow() {
                 </>
               )}
 
-              <SummaryRow
-                label="Method"
-                value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire Transfer' : 'International Wire'}
-              />
+              <SummaryRow label="Method" value={methodSummaryLabel} />
+              {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
               {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, currency || 'CAD')}`} />}
               {method !== 'international_wire' && bank && (
                 <SummaryRow label="Bank" value={`${bank.name} - ****${bank.last4}`} />

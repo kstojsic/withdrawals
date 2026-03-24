@@ -58,6 +58,8 @@ export interface LinkedBank {
   last4: string;
   /** Currency for EFT/wire deposits to this linked account (defaults to CAD if omitted). */
   depositCurrency?: Currency;
+  /** Institution country: CA = Canadian bank, US = US bank (defaults to CA if omitted). */
+  institutionCountry?: 'CA' | 'US';
 }
 
 export interface InternationalWireData {

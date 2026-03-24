@@ -61,6 +61,8 @@ export interface FhsaWizardCtx {
   bankReady: boolean;
   qualifyingEligible: boolean;
   setQualifyingEligible: (v: boolean) => void;
+  qualifyingQuestionnaireComplete: boolean;
+  setQualifyingQuestionnaireComplete: (v: boolean) => void;
   qualifyingData: Record<string, unknown>;
   setQualifyingData: (d: Record<string, unknown>) => void;
   ovpExcessAmount: string;
@@ -273,8 +275,9 @@ export function buildFhsaWizardSteps(): MobileWizardStepDef<FhsaWizardCtx>[] {
                 amount={c.amount}
                 data={c.intlWire}
                 onChange={c.setIntlWire}
+                signed={c.signed}
+                onSign={() => c.setSigned(true)}
               />
-              <MobileESignature onSign={() => c.setSigned(true)} signed={c.signed} />
             </>
           ) : (
             <MobileBankSelector
@@ -290,7 +293,7 @@ export function buildFhsaWizardSteps(): MobileWizardStepDef<FhsaWizardCtx>[] {
     {
       id: 'fhsa-rc725',
       visible: (c) => c.isQualifying && c.bankReady,
-      canProceed: (c) => c.qualifyingEligible,
+      canProceed: (c) => c.qualifyingEligible || c.qualifyingQuestionnaireComplete,
       nextLabel: 'Continue',
       render: (c) => (
         <div className="flex flex-col gap-2">
@@ -305,6 +308,7 @@ export function buildFhsaWizardSteps(): MobileWizardStepDef<FhsaWizardCtx>[] {
               c.setQualifyingEligible(elig);
               c.setQualifyingData(data as unknown as Record<string, unknown>);
             }}
+            onQuestionnaireComplete={c.setQualifyingQuestionnaireComplete}
             withdrawalAmount={c.amount}
             onWithdrawalAmountChange={c.setAmount}
           />
@@ -516,7 +520,7 @@ export function buildFhsaWizardSteps(): MobileWizardStepDef<FhsaWizardCtx>[] {
           !c.exceedsAvailable &&
           !!c.method &&
           c.bankReady &&
-          c.qualifyingEligible) ||
+          (c.qualifyingEligible || c.qualifyingQuestionnaireComplete)) ||
         (c.isNonQualifying && c.canContinueNonQualifying) ||
         (c.isOvercontribution && c.canContinueOvercontribution),
       canProceed: () => true,

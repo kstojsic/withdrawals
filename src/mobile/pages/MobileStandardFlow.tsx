@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useLinkedBankWithdrawalRules } from '../../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 import MobileButton from '../components/MobileButton';
@@ -7,8 +8,7 @@ import MobileBankDepositDropdown from '../components/MobileBankDepositDropdown';
 import MobileWithdrawalMethodDropdown from '../components/MobileWithdrawalMethodDropdown';
 import MobileThreeStepProgress from '../components/MobileThreeStepProgress';
 import MobileWithdrawalAmountStep from '../components/MobileWithdrawalAmountStep';
-import MobileInputField from '../components/MobileInputField';
-import MobileESignature from '../components/MobileESignature';
+import MobileInternationalWireForm from '../components/MobileInternationalWireForm';
 import {
   accounts,
   linkedBanks as defaultBanks,
@@ -16,6 +16,7 @@ import {
   getLinkedBankDepositCurrency,
   getWithdrawalAmountStepData,
 } from '../../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData } from '../../types';
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -66,6 +67,8 @@ export default function MobileStandardFlow() {
 
   const bank = allBanks.find((b) => b.id === selectedBank);
 
+  const { methodDisabled } = useLinkedBankWithdrawalRules(allBanks, selectedBank, setMethod, setIntlWire);
+
   const withdrawalCurrency: Currency = useMemo(() => {
     if (method === 'international_wire') return intlWire.currency;
     return getLinkedBankDepositCurrency(bank);
@@ -105,34 +108,52 @@ export default function MobileStandardFlow() {
   const netAmount = parsedAmount - fee;
 
   const step0Complete = useMemo(() => {
-    if (!account) return false;
+    if (!account || !selectedBank) return false;
     if (method === 'international_wire') {
       return !!(intlWire.bankName?.trim() && intlWire.swiftCode?.trim() && signed);
     }
-    return !!selectedBank;
+    return true;
   }, [account, method, intlWire.bankName, intlWire.swiftCode, selectedBank, signed]);
 
   const step1Complete = parsedAmount > 0;
 
   const renderReviewSummary = useCallback(() => {
     if (!account) return null;
+    const methodSummaryLabel = withdrawalMethodSummaryLabel(method);
+    const methodEta = withdrawalMethodEtaSummary(method);
     return (
       <>
         <SummaryRow label="Account" value={`${account.label} - ${account.accountNumber}`} />
-        {method !== 'international_wire' && bank && (
+        {bank && (
           <SummaryRow label="Deposit bank" value={`${bank.name} · ****${bank.last4} (${getLinkedBankDepositCurrency(bank)})`} />
         )}
         <SummaryRow label="Currency" value={withdrawalCurrency} />
         <SummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, withdrawalCurrency)} />
-        <SummaryRow
-          label="Method"
-          value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire transfer' : 'International wire'}
-        />
+        <SummaryRow label="Method" value={methodSummaryLabel} />
+        {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
         {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, withdrawalCurrency)}`} />}
         {method === 'international_wire' && (
           <>
+            <SummaryRow label="Wire currency" value={intlWire.currency} />
             <SummaryRow label="Receiving bank" value={intlWire.bankName} />
+            {intlWire.bankCity.trim() ? <SummaryRow label="City" value={intlWire.bankCity} /> : null}
+            {intlWire.bankCountry.trim() ? <SummaryRow label="Country" value={intlWire.bankCountry} /> : null}
             <SummaryRow label="SWIFT / BIC" value={intlWire.swiftCode} />
+            {intlWire.bankAccountNumber.trim() ? (
+              <SummaryRow label="Account / IBAN" value={intlWire.bankAccountNumber} />
+            ) : null}
+            {intlWire.routingNumber.trim() ? <SummaryRow label="Routing number" value={intlWire.routingNumber} /> : null}
+            {intlWire.hasIntermediary ? (
+              <SummaryRow
+                label="Intermediary bank"
+                value={
+                  [intlWire.intermediaryBankName, intlWire.intermediarySwiftCode].filter(Boolean).join(' · ') || 'Yes'
+                }
+              />
+            ) : null}
+            {intlWire.isBrokerage ? (
+              <SummaryRow label="Brokerage" value={intlWire.brokerageName || 'Yes'} />
+            ) : null}
           </>
         )}
         <div className="flex items-center justify-between gap-2 bg-qt-bg-3 px-3 py-3">
@@ -143,7 +164,16 @@ export default function MobileStandardFlow() {
         </div>
       </>
     );
-  }, [account, bank, fee, intlWire.bankName, intlWire.swiftCode, method, netAmount, parsedAmount, withdrawalCurrency]);
+  }, [
+    account,
+    bank,
+    fee,
+    intlWire,
+    method,
+    netAmount,
+    parsedAmount,
+    withdrawalCurrency,
+  ]);
 
   const handleMethodChange = useCallback((m: WithdrawalMethod) => {
     setMethod(m);
@@ -249,56 +279,27 @@ export default function MobileStandardFlow() {
             <MobileAccountDropdown accounts={accounts} value={account?.id ?? null} onChange={handleAccountChange} />
             {account && (
               <>
-                {method !== 'international_wire' ? (
-                  <MobileBankDepositDropdown
-                    value={selectedBank}
-                    onChange={setSelectedBank}
-                    allBanks={allBanks}
-                    onBanksChange={setAllBanks}
-                  />
-                ) : (
-                  <p className="rounded-lg bg-qt-bg-3 px-3 py-2 text-[11px] text-qt-secondary">
-                    International wires go to the bank you specify below — no Canadian deposit account needed.
-                  </p>
-                )}
+                <MobileBankDepositDropdown
+                  value={selectedBank}
+                  onChange={setSelectedBank}
+                  allBanks={allBanks}
+                  onBanksChange={setAllBanks}
+                />
                 <MobileWithdrawalMethodDropdown
                   value={method}
                   onChange={handleMethodChange}
                   currencyHint={withdrawalCurrency}
+                  methodDisabled={methodDisabled}
                 />
                 {method === 'international_wire' && (
-                  <div className="flex flex-col gap-3 rounded-xl border border-figma-neutral-100 bg-figma-neutral-00 p-3">
-                    <p className="text-xs font-semibold text-qt-primary">Wire currency</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['CAD', 'USD'] as const).map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setIntlWire((d) => ({ ...d, currency: c }))}
-                          className={`min-h-[40px] rounded-lg border-2 text-sm font-bold ${
-                            intlWire.currency === c
-                              ? 'border-qt-green bg-qt-green-bg/30'
-                              : 'border-figma-neutral-100 bg-figma-neutral-00'
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                    <MobileInputField
-                      label="Receiving bank name"
-                      placeholder="Bank name"
-                      value={intlWire.bankName}
-                      onChange={(e) => setIntlWire((d) => ({ ...d, bankName: e.target.value }))}
-                    />
-                    <MobileInputField
-                      label="SWIFT / BIC code"
-                      placeholder="e.g. BOFAUS3N"
-                      value={intlWire.swiftCode}
-                      onChange={(e) => setIntlWire((d) => ({ ...d, swiftCode: e.target.value }))}
-                    />
-                    <MobileESignature onSign={() => setSigned(true)} signed={signed} />
-                  </div>
+                  <MobileInternationalWireForm
+                    currency={withdrawalCurrency}
+                    amount={amount}
+                    data={intlWire}
+                    onChange={setIntlWire}
+                    signed={signed}
+                    onSign={() => setSigned(true)}
+                  />
                 )}
               </>
             )}

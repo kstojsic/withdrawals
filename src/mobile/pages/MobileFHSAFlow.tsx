@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useLinkedBankWithdrawalRules } from '../../hooks/useLinkedBankWithdrawalRules';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft, Download } from 'lucide-react';
 import MobileButton from '../components/MobileButton';
@@ -9,7 +10,7 @@ import MobileWithdrawalTypeDropdown from '../components/MobileWithdrawalTypeDrop
 import MobileThreeStepProgress from '../components/MobileThreeStepProgress';
 import MobileWithdrawalAmountStep from '../components/MobileWithdrawalAmountStep';
 import MobileWithdrawAvailableSummary from '../components/MobileWithdrawAvailableSummary';
-import MobileInputField from '../components/MobileInputField';
+import MobileInternationalWireForm from '../components/MobileInternationalWireForm';
 import MobileESignature from '../components/MobileESignature';
 import MobileRadioOption from '../components/MobileRadioOption';
 import MobileOptionCards from '../components/MobileOptionCards';
@@ -26,6 +27,7 @@ import {
   stripFormatting,
   calculateWithholdingTax,
 } from '../../data/accounts';
+import { withdrawalMethodEtaSummary, withdrawalMethodSummaryLabel } from '../../lib/withdrawalMethodSummary';
 import type { Account, Currency, WithdrawalMethod, LinkedBank, InternationalWireData, FHSAWithdrawalType } from '../../types';
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
@@ -83,6 +85,7 @@ export default function MobileFHSAFlow() {
   const [intlWire, setIntlWire] = useState<InternationalWireData>(defaultIntl);
   const [signed, setSigned] = useState(false);
   const [qualifyingEligible, setQualifyingEligible] = useState(false);
+  const [qualifyingQuestionnaireComplete, setQualifyingQuestionnaireComplete] = useState(false);
   const [qualifyingData, setQualifyingData] = useState<Record<string, unknown>>({});
   /** Qualifying only: 0 = amount, 1 = RC725 eligibility (both still "Withdrawal Details" step). */
   const [fhsaQualSubStep, setFhsaQualSubStep] = useState<0 | 1>(0);
@@ -97,6 +100,8 @@ export default function MobileFHSAFlow() {
   const [ovpSigned, setOvpSigned] = useState(false);
 
   const bank = allBanks.find((b) => b.id === selectedBank);
+
+  const { methodDisabled } = useLinkedBankWithdrawalRules(allBanks, selectedBank, setMethod, setIntlWire);
 
   const withdrawalCurrency: Currency = useMemo(() => {
     if (method === 'international_wire') return intlWire.currency;
@@ -119,7 +124,10 @@ export default function MobileFHSAFlow() {
   const fee =
     method === 'wire' ? (withdrawalCurrency === 'USD' ? 30 : 20) : method === 'international_wire' ? 40 : 0;
 
-  const withholdingTax = isNonQualifying && parsedAmount > 0 ? calculateWithholdingTax(parsedAmount) : 0;
+  const withholdingTax =
+    (isNonQualifying || (isQualifying && !qualifyingEligible)) && parsedAmount > 0
+      ? calculateWithholdingTax(parsedAmount)
+      : 0;
   const netAmount = parsedAmount - withholdingTax - fee;
 
   const ovpRemovalOptions =
@@ -140,6 +148,7 @@ export default function MobileFHSAFlow() {
     setAmount('');
     setGrossAmount(0);
     setQualifyingEligible(false);
+    setQualifyingQuestionnaireComplete(false);
     setQualifyingData({});
     setFhsaQualSubStep(0);
     setOvpExcessAmount('');
@@ -193,16 +202,17 @@ export default function MobileFHSAFlow() {
   }, [isOvercontribution, parsedAmount, ovpExcessAmount]);
 
   const step0Complete = useMemo(() => {
-    if (!account || !fhsaType) return false;
+    if (!account || !fhsaType || !selectedBank) return false;
     if (method === 'international_wire') {
       return !!(intlWire.bankName?.trim() && intlWire.swiftCode?.trim() && signed);
     }
-    return !!selectedBank;
+    return true;
   }, [account, fhsaType, method, intlWire.bankName, intlWire.swiftCode, selectedBank, signed]);
 
   const step1CompleteNonQual = isNonQualifying && grossAmount > 0 && !exceedsAvailable;
   const qualAmountOk = parsedAmount > 0 && !exceedsAvailable;
-  const step1CompleteQual = isQualifying && qualAmountOk && qualifyingEligible;
+  const step1CompleteQual =
+    isQualifying && qualAmountOk && (qualifyingEligible || qualifyingQuestionnaireComplete);
   const step1CompleteOvp =
     isOvercontribution &&
     parsedAmount > 0 &&
@@ -237,22 +247,40 @@ export default function MobileFHSAFlow() {
         <SummaryRow label="Withdrawal type" value={typeLabel} />
         <SummaryRow label="Currency" value={withdrawalCurrency} />
         <SummaryRow label="Withdrawal amount" value={formatCurrency(parsedAmount, withdrawalCurrency)} />
-        {isNonQualifying && (
+        {(isNonQualifying || (isQualifying && !qualifyingEligible)) && withholdingTax > 0 && (
           <SummaryRow label="Withholding tax" value={`-${formatCurrency(withholdingTax, withdrawalCurrency)}`} />
         )}
-        {isQualifying && <SummaryRow label="Withholding tax" value="$0.00 (Tax-free)" />}
-        <SummaryRow
-          label="Method"
-          value={method === 'eft' ? 'EFT' : method === 'wire' ? 'Wire transfer' : 'International wire'}
-        />
+        {isQualifying && qualifyingEligible && (
+          <SummaryRow label="Withholding tax" value="$0.00 (Tax-free)" />
+        )}
+        <SummaryRow label="Method" value={methodSummaryLabel} />
+        {methodEta ? <SummaryRow label="ETA" value={methodEta} /> : null}
         {fee > 0 && <SummaryRow label="Fee" value={`-${formatCurrency(fee, withdrawalCurrency)}`} />}
-        {method !== 'international_wire' && bank && (
+        {bank && (
           <SummaryRow label="Deposit bank" value={`${bank.name} · ****${bank.last4} (${getLinkedBankDepositCurrency(bank)})`} />
         )}
         {method === 'international_wire' && (
           <>
+            <SummaryRow label="Wire currency" value={intlWire.currency} />
             <SummaryRow label="Receiving bank" value={intlWire.bankName} />
+            {intlWire.bankCity.trim() ? <SummaryRow label="City" value={intlWire.bankCity} /> : null}
+            {intlWire.bankCountry.trim() ? <SummaryRow label="Country" value={intlWire.bankCountry} /> : null}
             <SummaryRow label="SWIFT / BIC" value={intlWire.swiftCode} />
+            {intlWire.bankAccountNumber.trim() ? (
+              <SummaryRow label="Account / IBAN" value={intlWire.bankAccountNumber} />
+            ) : null}
+            {intlWire.routingNumber.trim() ? <SummaryRow label="Routing number" value={intlWire.routingNumber} /> : null}
+            {intlWire.hasIntermediary ? (
+              <SummaryRow
+                label="Intermediary bank"
+                value={
+                  [intlWire.intermediaryBankName, intlWire.intermediarySwiftCode].filter(Boolean).join(' · ') || 'Yes'
+                }
+              />
+            ) : null}
+            {intlWire.isBrokerage ? (
+              <SummaryRow label="Brokerage" value={intlWire.brokerageName || 'Yes'} />
+            ) : null}
           </>
         )}
         <div className="flex items-center justify-between gap-2 bg-qt-bg-3 px-3 py-3">
@@ -309,11 +337,11 @@ export default function MobileFHSAFlow() {
     account,
     bank,
     fee,
-    intlWire.bankName,
-    intlWire.swiftCode,
+    intlWire,
     isNonQualifying,
     isOvercontribution,
     isQualifying,
+    qualifyingEligible,
     method,
     netAmount,
     ovpExcessAmount,
@@ -360,6 +388,7 @@ export default function MobileFHSAFlow() {
     isQualifying,
     fhsaQualSubStep,
     qualAmountOk,
+    qualifyingQuestionnaireComplete,
     step1CompleteQual,
     parsedAmount,
   ]);
@@ -372,7 +401,7 @@ export default function MobileFHSAFlow() {
         ? isQualifying
           ? fhsaQualSubStep === 0
             ? !qualAmountOk
-            : !(qualAmountOk && qualifyingEligible)
+            : !(qualAmountOk && (qualifyingEligible || qualifyingQuestionnaireComplete))
           : !step1Complete
         : step === 2
           ? !account || netAmount < 0
@@ -461,22 +490,17 @@ export default function MobileFHSAFlow() {
             <MobileAccountDropdown accounts={accounts} value={account?.id ?? null} onChange={handleAccountChange} />
             {account && (
               <>
-                {method !== 'international_wire' ? (
-                  <MobileBankDepositDropdown
-                    value={selectedBank}
-                    onChange={setSelectedBank}
-                    allBanks={allBanks}
-                    onBanksChange={setAllBanks}
-                  />
-                ) : (
-                  <p className="rounded-lg bg-qt-bg-3 px-3 py-2 text-[11px] text-qt-secondary">
-                    International wires go to the bank you specify below — no Canadian deposit account needed.
-                  </p>
-                )}
+                <MobileBankDepositDropdown
+                  value={selectedBank}
+                  onChange={setSelectedBank}
+                  allBanks={allBanks}
+                  onBanksChange={setAllBanks}
+                />
                 <MobileWithdrawalMethodDropdown
                   value={method}
                   onChange={handleMethodChange}
                   currencyHint={withdrawalCurrency}
+                  methodDisabled={methodDisabled}
                 />
                 <MobileWithdrawalTypeDropdown<FHSAWithdrawalType>
                   label="Withdrawal type"
@@ -485,38 +509,14 @@ export default function MobileFHSAFlow() {
                   onChange={handleFhsaTypeChange}
                 />
                 {method === 'international_wire' && (
-                  <div className="flex flex-col gap-3 rounded-xl border border-figma-neutral-100 bg-figma-neutral-00 p-3">
-                    <p className="text-xs font-semibold text-qt-primary">Wire currency</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(['CAD', 'USD'] as const).map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setIntlWire((d) => ({ ...d, currency: c }))}
-                          className={`min-h-[40px] rounded-lg border-2 text-sm font-bold ${
-                            intlWire.currency === c
-                              ? 'border-qt-green bg-qt-green-bg/30'
-                              : 'border-figma-neutral-100 bg-figma-neutral-00'
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                    <MobileInputField
-                      label="Receiving bank name"
-                      placeholder="Bank name"
-                      value={intlWire.bankName}
-                      onChange={(e) => setIntlWire((d) => ({ ...d, bankName: e.target.value }))}
-                    />
-                    <MobileInputField
-                      label="SWIFT / BIC code"
-                      placeholder="e.g. BOFAUS3N"
-                      value={intlWire.swiftCode}
-                      onChange={(e) => setIntlWire((d) => ({ ...d, swiftCode: e.target.value }))}
-                    />
-                    <MobileESignature onSign={() => setSigned(true)} signed={signed} />
-                  </div>
+                  <MobileInternationalWireForm
+                    currency={withdrawalCurrency}
+                    amount={amount}
+                    data={intlWire}
+                    onChange={setIntlWire}
+                    signed={signed}
+                    onSign={() => setSigned(true)}
+                  />
                 )}
               </>
             )}
@@ -597,6 +597,7 @@ export default function MobileFHSAFlow() {
                         setQualifyingEligible(elig);
                         setQualifyingData(data as unknown as Record<string, unknown>);
                       }}
+                      onQuestionnaireComplete={setQualifyingQuestionnaireComplete}
                       withdrawalAmount={amount}
                       onWithdrawalAmountChange={setAmount}
                     />

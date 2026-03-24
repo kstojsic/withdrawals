@@ -1,4 +1,4 @@
-import type { Account, BalanceInfo, Currency, LinkedBank } from '../types';
+import type { Account, BalanceInfo, Currency, LinkedBank, WithdrawalMethod } from '../types';
 
 export const FX_RATE = 1.36;
 export const FX_BUFFER = 0.0225;
@@ -78,6 +78,7 @@ export const linkedBanks: LinkedBank[] = [
     accountNumber: '1234567',
     last4: '4567',
     depositCurrency: 'CAD',
+    institutionCountry: 'CA',
   },
   {
     id: 'b2',
@@ -87,6 +88,17 @@ export const linkedBanks: LinkedBank[] = [
     accountNumber: '7654321',
     last4: '4321',
     depositCurrency: 'CAD',
+    institutionCountry: 'CA',
+  },
+  {
+    id: 'b-cad-usd',
+    name: 'RBC Royal Bank (USD account)',
+    institutionNumber: '003',
+    transitNumber: '00022',
+    accountNumber: '5544332',
+    last4: '4332',
+    depositCurrency: 'USD',
+    institutionCountry: 'CA',
   },
   {
     id: 'b-usd-1',
@@ -96,6 +108,7 @@ export const linkedBanks: LinkedBank[] = [
     accountNumber: '9988776655',
     last4: '6655',
     depositCurrency: 'USD',
+    institutionCountry: 'US',
   },
 ];
 
@@ -116,6 +129,28 @@ export const bankOptions = [
 
 export function getLinkedBankDepositCurrency(bank: LinkedBank | null | undefined): Currency {
   return bank?.depositCurrency ?? 'CAD';
+}
+
+/** Per-method disabled state from linked deposit bank (country + deposit currency). */
+export type WithdrawalMethodDisableFlags = Record<WithdrawalMethod, boolean>;
+
+/**
+ * Canadian institution (CA): international wire disabled; EFT + domestic wire allowed (CAD or USD account).
+ * US institution + USD account: only international wire; EFT and wire disabled.
+ */
+export function getWithdrawalMethodDisableFlags(bank: LinkedBank | null | undefined): WithdrawalMethodDisableFlags {
+  const none: WithdrawalMethodDisableFlags = {
+    eft: false,
+    wire: false,
+    international_wire: false,
+  };
+  if (!bank) return none;
+  const country = bank.institutionCountry ?? 'CA';
+  const dep = getLinkedBankDepositCurrency(bank);
+  if (country === 'US' && dep === 'USD') {
+    return { eft: true, wire: true, international_wire: false };
+  }
+  return { eft: false, wire: false, international_wire: true };
 }
 
 export function formatCurrency(amount: number, currency: 'CAD' | 'USD' = 'CAD'): string {

@@ -11,6 +11,7 @@ type YesNo = 'yes' | 'no' | null;
 
 interface LLPState {
   student: 'you' | 'spouse' | null;
+  residentOfCanada: YesNo;
   firstName: string;
   lastName: string;
   sin: string;
@@ -30,6 +31,7 @@ interface LLPState {
 
 const initialState: LLPState = {
   student: null,
+  residentOfCanada: null,
   firstName: 'Anastasia',
   lastName: 'Carmichael',
   sin: '***-***-789',
@@ -66,6 +68,10 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
   function set<K extends keyof LLPState>(field: K, val: LLPState[K]) {
     setS((prev) => {
       const next = { ...prev, [field]: val };
+
+      if (field === 'student') {
+        next.residentOfCanada = null;
+      }
 
       if (field === 'enrolled') {
         next.enrollmentType = null;
@@ -129,16 +135,18 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
   const yearlyExceeds = lineA + lineB > yearlyLimit;
   const totalExceeds = lineA + lineB + lineC > lifetimeLimit;
 
+  const isTerminal_nonResident = s.residentOfCanada === 'no';
   const isTerminal_notEnrolled = s.enrolled === 'no';
   const isTerminal_noDisability = s.enrollmentType === 'part-time' && s.disabilityCondition === 'no';
   const isTerminal_afterFourthYear = s.afterFourthYear === 'yes';
 
-  const isTerminalEarly = isTerminal_notEnrolled || isTerminal_noDisability;
+  const isTerminalEarly = isTerminal_nonResident || isTerminal_notEnrolled || isTerminal_noDisability;
   const isTerminal = isTerminalEarly || isTerminal_afterFourthYear;
 
   const questionsComplete =
     !isTerminal &&
     s.student !== null &&
+    s.residentOfCanada === 'yes' &&
     s.enrolled === 'yes' &&
     s.enrollmentType !== null &&
     (s.enrollmentType === 'full-time' || s.disabilityCondition === 'yes') &&
@@ -156,7 +164,7 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
 
   // Group visibility — each group stays visible once shown,
   // terminal states render inside their own group
-  const g1Done = s.student !== null;
+  const g1Done = s.student !== null && s.residentOfCanada === 'yes';
   const enrollmentOk = s.enrollmentType === 'full-time' || (s.enrollmentType === 'part-time' && s.disabilityCondition === 'yes');
   const g2Done = s.enrolled === 'yes' && enrollmentOk;
   const g3Done = (s.previousWithdrawals === 'no' || (s.previousWithdrawals === 'yes' && s.afterFourthYear === 'no'));
@@ -200,6 +208,36 @@ export default function LLPEligibility({ onComplete, withdrawalAmount, onWithdra
               <InputField label="Last name" value={s.lastName} onChange={(e) => set('lastName', e.target.value)} placeholder="Enter last name" />
               <InputField label="Social Insurance Number (SIN)" value={s.sin} onChange={(e) => set('sin', e.target.value)} placeholder="e.g. 123-456-789" maxLength={11} />
             </div>
+          )}
+
+          {s.student !== null && (
+            <div>
+              <p className="text-sm text-qt-primary leading-[22px] mb-3 font-semibold">
+                {s.student === 'you'
+                  ? 'Are you a resident of Canada for tax purposes?'
+                  : 'Is your spouse or common-law partner (the LLP student) a resident of Canada for tax purposes?'}
+              </p>
+              <div className="flex gap-6">
+                <RadioButton
+                  name="llp-resident"
+                  value="yes"
+                  label="Yes"
+                  checked={s.residentOfCanada === 'yes'}
+                  onChange={() => set('residentOfCanada', 'yes')}
+                />
+                <RadioButton
+                  name="llp-resident"
+                  value="no"
+                  label="No"
+                  checked={s.residentOfCanada === 'no'}
+                  onChange={() => set('residentOfCanada', 'no')}
+                />
+              </div>
+            </div>
+          )}
+
+          {isTerminal_nonResident && (
+            <Terminal message="The Lifelong Learning Plan is only available to Canadian residents for tax purposes. You are not eligible for this LLP withdrawal." />
           )}
         </QuestionGroup>
 

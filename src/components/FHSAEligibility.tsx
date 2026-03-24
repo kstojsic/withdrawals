@@ -41,11 +41,18 @@ const initialState: FHSAState = {
 
 interface FHSAEligibilityProps {
   onComplete: (eligible: boolean, data: FHSAState) => void;
+  /** True when the full RC725 questionnaire is finished (including non–tax-free outcomes). */
+  onQuestionnaireComplete?: (complete: boolean) => void;
   withdrawalAmount: string;
   onWithdrawalAmountChange: (val: string) => void;
 }
 
-export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdrawalAmountChange }: FHSAEligibilityProps) {
+export default function FHSAEligibility({
+  onComplete,
+  onQuestionnaireComplete,
+  withdrawalAmount,
+  onWithdrawalAmountChange,
+}: FHSAEligibilityProps) {
   const [s, setS] = useState<FHSAState>({ ...initialState, withdrawalAmount });
 
   useEffect(() => {
@@ -104,6 +111,7 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
   const isTerminalG3 = t_noAgreement || t_notPrimary;
   const isTerminal = isTerminalG1 || isTerminalG2 || isTerminalG3;
 
+  /** Both residency questions must be "yes" before continuing (non-residents cannot complete a qualifying withdrawal). */
   const g1Done = s.resident === 'yes' && s.remainResident === 'yes';
   const g2Done = s.ownedHome === 'no' && (s.takenOwnership === 'not_yet' || s.takenOwnership === 'within_30');
   const g3Done = s.hasAgreement === 'yes' && s.primaryResidence === 'yes';
@@ -115,14 +123,27 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
   const showQ9 = showG4 && s.street !== '' && s.city !== '' && s.province !== '' && s.postalCode !== '';
   const parsedAmount = parseFloat(s.withdrawalAmount) || 0;
 
+  const questionnaireComplete =
+    !isTerminal &&
+    showG4 &&
+    parsedAmount > 0 &&
+    s.street !== '' &&
+    s.city !== '' &&
+    s.province !== '' &&
+    s.postalCode !== '' &&
+    s.signed &&
+    s.agreed;
+
   const eligible =
-    !isTerminal && showG4 && parsedAmount > 0 &&
-    s.street !== '' && s.city !== '' && s.province !== '' && s.postalCode !== '' &&
-    s.signed && s.agreed;
+    questionnaireComplete && s.resident === 'yes' && s.remainResident === 'yes';
 
   useEffect(() => {
     onComplete(!!eligible, s);
   }, [eligible, s]);
+
+  useEffect(() => {
+    onQuestionnaireComplete?.(!!questionnaireComplete);
+  }, [questionnaireComplete, onQuestionnaireComplete]);
 
   const totalSteps = 4;
 
@@ -146,7 +167,9 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
             </div>
           </div>
 
-          {t_notResident && <Terminal msg="You must be a resident of Canada to make a tax-free qualifying withdrawal." />}
+          {t_notResident && (
+            <Terminal msg="Only residents of Canada can receive a tax-free qualifying FHSA withdrawal. You are not eligible for this qualifying withdrawal." />
+          )}
 
           {s.resident === 'yes' && (
             <div>
@@ -232,9 +255,20 @@ export default function FHSAEligibility({ onComplete, withdrawalAmount, onWithdr
         {/* Group 4: Property & Withdrawal Details */}
         {showG4 && (
           <QuestionGroup title="Property & Withdrawal Details" step={4} totalSteps={totalSteps}>
-            <InfoBox variant="success">
-              <p className="font-semibold">You are eligible for a tax-free qualifying FHSA withdrawal.</p>
-            </InfoBox>
+            {eligible && (
+              <InfoBox variant="success">
+                <p className="font-semibold">You are eligible for a tax-free qualifying FHSA withdrawal.</p>
+              </InfoBox>
+            )}
+            {questionnaireComplete && !eligible && (
+              <InfoBox variant="warning">
+                <p>
+                  <strong>Tax treatment.</strong> Based on your answers, this withdrawal does not qualify as tax-free (for
+                  example, if you are not a resident of Canada or do not meet the other qualifying conditions). You can
+                  still submit your withdrawal request for review.
+                </p>
+              </InfoBox>
+            )}
 
             <AddressInput
               value={{ street: s.street, city: s.city, province: s.province, postalCode: s.postalCode }}

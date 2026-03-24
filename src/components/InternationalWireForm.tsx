@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import type { Currency, InternationalWireData } from '../types';
+import { hasInternationalWireBeneficiaryCore } from '../lib/internationalWire';
 import InputField from './InputField';
 import RadioButton from './RadioButton';
 
@@ -13,6 +15,15 @@ export default function InternationalWireForm({ currency, amount, onChange, data
   function update(field: keyof InternationalWireData, value: string | boolean) {
     onChange({ ...data, [field]: value });
   }
+
+  const coreComplete = hasInternationalWireBeneficiaryCore(data);
+  const [showFullForm, setShowFullForm] = useState(false);
+
+  useEffect(() => {
+    if (!coreComplete) setShowFullForm(false);
+  }, [coreComplete]);
+
+  const compact = coreComplete && !showFullForm;
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,14 +47,31 @@ export default function InternationalWireForm({ currency, amount, onChange, data
         </div>
       </div>
 
-      <InputField
-        label="Reason for wire transfer"
-        placeholder="e.g. Personal funds transfer"
-        value={data.reason}
-        onChange={(e) => update('reason', e.target.value)}
-      />
-
-      <div className="border-t border-qt-border pt-6">
+      {compact ? (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-lg border border-qt-border bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-qt-secondary">Receiving bank (saved)</p>
+            <p className="mt-2 text-sm font-semibold text-qt-primary">{data.bankName}</p>
+            <p className="mt-1 text-sm text-qt-secondary">
+              SWIFT / BIC: <span className="font-semibold text-qt-primary">{data.swiftCode}</span>
+            </p>
+            {data.bankAccountNumber?.trim() ? (
+              <p className="mt-1 text-sm text-qt-secondary">
+                Account: <span className="font-semibold text-qt-primary">{data.bankAccountNumber}</span>
+              </p>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFullForm(true)}
+            className="text-left text-sm font-semibold text-qt-green-dark hover:underline cursor-pointer"
+          >
+            Change receiving bank details
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="border-t border-qt-border pt-6">
         <p className="font-semibold text-base text-qt-primary leading-6 mb-4">International bank information</p>
         <div className="flex flex-col gap-4">
           <InputField
@@ -190,6 +218,18 @@ export default function InternationalWireForm({ currency, amount, onChange, data
           </div>
         )}
       </div>
+
+          {coreComplete && (
+            <button
+              type="button"
+              onClick={() => setShowFullForm(false)}
+              className="text-left text-sm font-semibold text-qt-secondary hover:underline cursor-pointer"
+            >
+              Use saved details only
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
