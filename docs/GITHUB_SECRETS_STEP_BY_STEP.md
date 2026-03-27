@@ -54,7 +54,7 @@ The workflow **cannot deploy** until you add **three repository secrets** in Git
 
 ## Part 3 — Run the workflow again
 
-1. **Actions** tab → **Deploy to Vercel (mobile branch)**.
+1. **Actions** tab → **Deploy to Vercel (mobile flow)**.
 2. Open the **failed** run → **Re-run all jobs**,  
    **or** **Run workflow** (if you use manual dispatch).
 

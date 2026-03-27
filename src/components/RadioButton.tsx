@@ -19,22 +19,23 @@ export default function RadioButton({
 }: RadioButtonProps) {
   return (
     <label
-      className={`flex items-start gap-3 group ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-      htmlFor={`${name}-${value}`}
+      className={`flex items-start gap-3 group rounded-md focus-within:outline-none ${!disabled ? 'focus-within:ring-2 focus-within:ring-qt-green/50 focus-within:ring-offset-2' : ''} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
     >
-      <input
-        type="radio"
-        id={`${name}-${value}`}
-        name={name}
-        value={value}
-        checked={checked}
-        disabled={disabled}
-        onChange={onChange}
-        className="sr-only"
-      />
-      <div className="mt-0.5 shrink-0">
+      {/* Native control sits over the visible circle so focus/scroll-into-view does not yank the page (sr-only + iOS). */}
+      <div className="relative mt-0.5 shrink-0 size-5">
+        <input
+          type="radio"
+          id={`${name}-${value}`}
+          name={name}
+          value={value}
+          checked={checked}
+          disabled={disabled}
+          onChange={onChange}
+          className="absolute inset-0 z-10 m-0 size-5 cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+        />
         <div
-          className={`relative size-5 rounded-full border-2 transition-colors
+          aria-hidden
+          className={`pointer-events-none relative size-5 rounded-full border-2 transition-colors
             ${checked ? 'border-qt-green' : 'border-qt-gray-dark group-hover:border-qt-secondary'}
             ${disabled ? 'group-hover:border-qt-gray-dark' : ''}`}
         >

@@ -1,13 +1,14 @@
-# Production deploy on push to `mobile`.
+# Production deploy on push to `main` or `mobile` (Vite build includes mobile.html → /mobile).
 # Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID — see docs/VERCEL_DEPLOY.md
 #
 # Uses remote build on Vercel (no local `vercel pull` / `vercel build --prebuilt`) — fewer CI failures.
 
-name: Deploy to Vercel (mobile branch)
+name: Deploy to Vercel (mobile flow)
 
 on:
   push:
     branches:
+      - main
       - mobile
   workflow_dispatch:
 

@@ -3,7 +3,7 @@ import { useLinkedBankWithdrawalRules } from '../../hooks/useLinkedBankWithdrawa
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft, Download } from 'lucide-react';
 import MobileButton from '../components/MobileButton';
-import MobileAccountDropdown from '../components/MobileAccountDropdown';
+import MobileAccountSelectionList from '../components/MobileAccountSelectionList';
 import MobileBankDepositDropdown from '../components/MobileBankDepositDropdown';
 import MobileWithdrawalMethodDropdown from '../components/MobileWithdrawalMethodDropdown';
 import MobileWithdrawalTypeDropdown from '../components/MobileWithdrawalTypeDropdown';
@@ -75,7 +75,9 @@ export default function MobileFHSAFlow() {
   const rrspAccounts = useMemo(() => accounts.filter((a) => a.type === 'RRSP'), []);
 
   const [step, setStep] = useState<0 | 1 | 2>(0);
-  const [account, setAccount] = useState<Account | null>(() => accounts.find((a) => a.type === 'FHSA') ?? accounts[0] ?? null);
+  /** Step 0: 0 = choose account (list), 1 = bank / method / withdrawal type. */
+  const [accountInfoSubStep, setAccountInfoSubStep] = useState<0 | 1>(0);
+  const [account, setAccount] = useState<Account | null>(null);
   const [fhsaType, setFhsaType] = useState<FHSAWithdrawalType | ''>('');
   const [amount, setAmount] = useState('');
   const [grossAmount, setGrossAmount] = useState(0);
@@ -173,6 +175,7 @@ export default function MobileFHSAFlow() {
       setSigned(false);
       setFhsaType('');
       resetTypeSpecificFields();
+      setAccountInfoSubStep(0);
       setStep(0);
     },
     [navigate, resetTypeSpecificFields],
@@ -366,7 +369,11 @@ export default function MobileFHSAFlow() {
   ]);
 
   const handlePrimary = useCallback(() => {
-    if (step === 0 && step0Complete) {
+    if (step === 0 && accountInfoSubStep === 0) {
+      if (account?.type === 'FHSA') setAccountInfoSubStep(1);
+      return;
+    }
+    if (step === 0 && accountInfoSubStep === 1 && step0Complete) {
       if (isQualifying) setFhsaQualSubStep(0);
       setStep(1);
       return;
@@ -393,6 +400,7 @@ export default function MobileFHSAFlow() {
     }
   }, [
     step,
+    accountInfoSubStep,
     step0Complete,
     step1Complete,
     isQualifying,
@@ -401,13 +409,16 @@ export default function MobileFHSAFlow() {
     qualifyingQuestionnaireComplete,
     step1CompleteQual,
     parsedAmount,
+    account,
   ]);
 
   const primaryLabel = step === 2 ? 'Submit' : 'Next';
   const primaryDisabled =
-    step === 0
-      ? !step0Complete
-      : step === 1
+    step === 0 && accountInfoSubStep === 0
+      ? !account || account.type !== 'FHSA'
+      : step === 0 && accountInfoSubStep === 1
+        ? !step0Complete
+        : step === 1
         ? isQualifying
           ? fhsaQualSubStep === 0
             ? !qualAmountOk
@@ -429,8 +440,20 @@ export default function MobileFHSAFlow() {
       setFhsaQualSubStep(0);
       return;
     }
-    setStep(0);
-  }, [step, isQualifying, fhsaQualSubStep, qualAmountOk]);
+    if (step === 1) {
+      setStep(0);
+      setAccountInfoSubStep(1);
+      return;
+    }
+    if (step === 0 && accountInfoSubStep === 1) {
+      setAccountInfoSubStep(0);
+      return;
+    }
+    if (step === 0 && accountInfoSubStep === 0) {
+      navigate('/');
+      return;
+    }
+  }, [step, isQualifying, fhsaQualSubStep, qualAmountOk, accountInfoSubStep, navigate]);
 
   if (submitted && account) {
     return (
@@ -455,7 +478,8 @@ export default function MobileFHSAFlow() {
             className="!h-[length:var(--ads-size-xl)] !min-h-[length:var(--ads-size-xl)] !gap-[length:var(--ads-size-nano)] !rounded-[length:var(--ads-border-radius-xl)] !bg-[var(--ads-color-primary-500)] !px-[length:var(--ads-size-s)] !py-[length:var(--ads-size-quark)] !text-base text-white active:opacity-90"
             onClick={() => {
               setSubmitted(false);
-              setAccount(accounts.find((a) => a.type === 'FHSA') ?? accounts[0] ?? null);
+              setAccount(null);
+              setAccountInfoSubStep(0);
               setFhsaType('');
               setSelectedBank(null);
               setMethod('eft');
@@ -475,7 +499,7 @@ export default function MobileFHSAFlow() {
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
       <div className="relative shrink-0">
-        {step > 0 && (
+        {(step > 0 || (step === 0 && accountInfoSubStep === 1)) && (
           <button
             type="button"
             onClick={goBack}
@@ -486,49 +510,63 @@ export default function MobileFHSAFlow() {
           </button>
         )}
         <div className="flex flex-col items-start gap-[length:var(--ads-size-xxxs)] self-stretch px-[length:var(--ads-size-xxs)] pb-2 pt-2">
-          <h1 className="w-full text-center font-[family-name:var(--ads-font-family-body)] text-[length:var(--ads-font-size-s)] font-semibold leading-[length:var(--ads-font-line-height-s)] text-[var(--ads-color-body-contrast-100)]">
-            {STEP_TITLES[step]}
+          <h1
+            className={
+              step === 0 && accountInfoSubStep === 0
+                ? 'w-full text-center font-[family-name:var(--ads-font-family-body)] text-xl font-semibold leading-7 text-[var(--ads-color-body-contrast-100)]'
+                : 'w-full text-center font-[family-name:var(--ads-font-family-body)] text-[length:var(--ads-font-size-s)] font-semibold leading-[length:var(--ads-font-line-height-s)] text-[var(--ads-color-body-contrast-100)]'
+            }
+          >
+            {step === 0 && accountInfoSubStep === 0 ? 'Choose an account' : STEP_TITLES[step]}
           </h1>
-          <MobileThreeStepProgress step={step} />
+          {!(step === 0 && accountInfoSubStep === 0) && <MobileThreeStepProgress step={step} />}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-[length:var(--ads-size-xxs)] pt-2 pb-4">
-        {step === 0 && (
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain [overflow-anchor:none] px-[length:var(--ads-size-xxs)] pt-2 pb-4">
+        {step === 0 && accountInfoSubStep === 0 && (
+          <div className="mx-auto flex w-full max-w-[357px] flex-col gap-4 pb-2">
+            <h2 className="w-full text-left font-[family-name:var(--ads-font-family-body)] text-lg font-semibold leading-[26px] text-[var(--ads-color-body-contrast-100)]">
+              Choose an account to withdraw from
+            </h2>
+            <MobileAccountSelectionList
+              accounts={accounts}
+              value={account?.id ?? null}
+              onSelect={handleAccountChange}
+            />
+          </div>
+        )}
+
+        {step === 0 && accountInfoSubStep === 1 && account && (
           <div className="flex flex-col gap-3">
             <p className="text-[11px] font-medium text-qt-primary">Tell us where to send your funds.</p>
-            <MobileAccountDropdown accounts={accounts} value={account?.id ?? null} onChange={handleAccountChange} />
-            {account && (
-              <>
-                <MobileBankDepositDropdown
-                  value={selectedBank}
-                  onChange={setSelectedBank}
-                  allBanks={allBanks}
-                  onBanksChange={setAllBanks}
-                />
-                <MobileWithdrawalMethodDropdown
-                  value={method}
-                  onChange={handleMethodChange}
-                  currencyHint={withdrawalCurrency}
-                  methodDisabled={methodDisabled}
-                />
-                <MobileWithdrawalTypeDropdown<FHSAWithdrawalType>
-                  label="Withdrawal type"
-                  options={FHSA_TYPE_OPTIONS}
-                  value={fhsaType}
-                  onChange={handleFhsaTypeChange}
-                />
-                {method === 'international_wire' && (
-                  <MobileInternationalWireForm
-                    currency={withdrawalCurrency}
-                    amount={amount}
-                    data={intlWire}
-                    onChange={setIntlWire}
-                    signed={signed}
-                    onSign={() => setSigned(true)}
-                  />
-                )}
-              </>
+            <MobileBankDepositDropdown
+              value={selectedBank}
+              onChange={setSelectedBank}
+              allBanks={allBanks}
+              onBanksChange={setAllBanks}
+            />
+            <MobileWithdrawalMethodDropdown
+              value={method}
+              onChange={handleMethodChange}
+              currencyHint={withdrawalCurrency}
+              methodDisabled={methodDisabled}
+            />
+            <MobileWithdrawalTypeDropdown<FHSAWithdrawalType>
+              label="Withdrawal type"
+              options={FHSA_TYPE_OPTIONS}
+              value={fhsaType}
+              onChange={handleFhsaTypeChange}
+            />
+            {method === 'international_wire' && (
+              <MobileInternationalWireForm
+                currency={withdrawalCurrency}
+                amount={amount}
+                data={intlWire}
+                onChange={setIntlWire}
+                signed={signed}
+                onSign={() => setSigned(true)}
+              />
             )}
           </div>
         )}

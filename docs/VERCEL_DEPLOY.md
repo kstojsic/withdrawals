@@ -1,4 +1,15 @@
-# Deploy to Vercel from the `mobile` branch
+# Deploy the mobile flow to Vercel
+
+The Vite build outputs **`mobile.html`** (see `vite.config.ts`). On Vercel, **`vercel.json`** rewrites:
+
+| URL | Serves |
+|-----|--------|
+| **`https://YOUR-PROJECT.vercel.app/mobile`** | `mobile.html` (recommended) |
+| **`https://YOUR-PROJECT.vercel.app/mobile.html`** | same app |
+
+The app uses **HashRouter** — open **`/mobile`** or **`/mobile.html`**, then routes are **`#/`, `#/fhsa`**, etc.
+
+Production deploys run on push to **`main`** or **`mobile`** (see `.github/workflows/vercel-mobile.yml`).
 
 If pushes to GitHub don’t create a new deployment, either **connect the repo in Vercel** or use **GitHub Actions** below (works even when the Vercel ↔ Git link is missing or wrong).
 
@@ -6,12 +17,12 @@ If pushes to GitHub don’t create a new deployment, either **connect the repo i
 
 1. [Vercel](https://vercel.com) → your project → **Settings** → **Git**
 2. **Connect** `kstojsic/withdrawals` (or your fork).
-3. Enable deployments for the **`mobile`** branch.
-4. To update **`https://YOUR-PROJECT.vercel.app`**: set **Production Branch** to **`mobile`** (same screen).
+3. Enable deployments for **`main`** and/or **`mobile`** (or only the branch you use).
+4. **Production branch:** use **`main`** or **`mobile`** depending on which branch you ship (same screen).
 
 ## Option B — GitHub Actions (token deploy)
 
-After you add secrets, **every push to `mobile`** runs a production deploy.
+After you add secrets, **every push to `main` or `mobile`** runs a production deploy.
 
 **If the workflow says secrets are empty:** follow **`docs/GITHUB_SECRETS_STEP_BY_STEP.md`** (exact names and where to click).
 
@@ -34,10 +45,10 @@ Repo **Settings** → **Secrets and variables** → **Actions** → **New reposi
 | `VERCEL_ORG_ID` | `team_…` or `user_…` |
 | `VERCEL_PROJECT_ID` | `prj_…` |
 
-### 4. Push `mobile` or re-run the workflow
+### 4. Push `main` / `mobile` or re-run the workflow
 
-- Push any commit to **`mobile`**, or  
-- **Actions** → **Deploy to Vercel (mobile branch)** → **Run workflow**.
+- Push any commit to **`main`** or **`mobile`**, or  
+- **Actions** → **Deploy to Vercel (mobile flow)** → **Run workflow**.
 
 ### 5. Open the site
 
@@ -53,3 +64,7 @@ If you use **both** Git integration and this workflow, you may get two deploymen
 - **Project ID** is **`prj_…`** from **Project → Settings → General**.
 
 The workflow uses **`vercel deploy --prod`** (build runs on Vercel), not local `vercel build --prebuilt`.
+
+### Local CLI (`vercel deploy`) fails with TLS / certificate errors
+
+On some corporate networks, `npx vercel deploy` fails with `unable to get local issuer certificate`. **Use Git push + Vercel Git integration or GitHub Actions** instead, or ask IT for a corporate root CA and set `NODE_EXTRA_CA_CERTS` to that PEM file before running the CLI.

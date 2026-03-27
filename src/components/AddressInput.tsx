@@ -86,7 +86,9 @@ export default function AddressInput({ value, onChange }: AddressInputProps) {
                 }
               }}
               onBlur={() => setTimeout(() => setOpen(false), 200)}
-              className="w-full h-12 rounded-md border border-qt-gray-dark bg-white pl-9 pr-4 text-sm text-qt-primary placeholder:text-qt-secondary placeholder:italic outline-none focus:border-qt-green"
+              autoComplete="street-address"
+              enterKeyHint="next"
+              className="w-full h-12 rounded-md border border-qt-gray-dark bg-white pl-9 pr-4 text-[16px] leading-normal text-qt-primary placeholder:text-qt-secondary placeholder:italic outline-none focus:border-qt-green md:text-sm md:leading-normal"
             />
           </div>
 
@@ -119,7 +121,9 @@ export default function AddressInput({ value, onChange }: AddressInputProps) {
               type="text"
               value={value.city}
               onChange={(e) => { onChange({ ...value, city: e.target.value }); setAutoFilled(false); }}
-              className={`w-full h-12 rounded-md border bg-white px-4 text-sm text-qt-primary outline-none transition-colors
+              autoComplete="address-level2"
+              enterKeyHint="next"
+              className={`w-full h-12 rounded-md border bg-white px-4 text-[16px] leading-normal text-qt-primary outline-none transition-colors md:text-sm md:leading-normal
                 ${autoFilled && value.city ? 'border-qt-green bg-qt-green-bg/20' : 'border-qt-gray-dark focus:border-qt-green'}`}
               readOnly={autoFilled && !!value.city}
             />
@@ -130,7 +134,9 @@ export default function AddressInput({ value, onChange }: AddressInputProps) {
               type="text"
               value={value.province}
               onChange={(e) => { onChange({ ...value, province: e.target.value }); setAutoFilled(false); }}
-              className={`w-full h-12 rounded-md border bg-white px-4 text-sm text-qt-primary outline-none transition-colors
+              autoComplete="address-level1"
+              enterKeyHint="next"
+              className={`w-full h-12 rounded-md border bg-white px-4 text-[16px] leading-normal text-qt-primary outline-none transition-colors md:text-sm md:leading-normal
                 ${autoFilled && value.province ? 'border-qt-green bg-qt-green-bg/20' : 'border-qt-gray-dark focus:border-qt-green'}`}
               readOnly={autoFilled && !!value.province}
             />
@@ -141,7 +147,9 @@ export default function AddressInput({ value, onChange }: AddressInputProps) {
               type="text"
               value={value.postalCode}
               onChange={(e) => { onChange({ ...value, postalCode: e.target.value }); setAutoFilled(false); }}
-              className={`w-full h-12 rounded-md border bg-white px-4 text-sm text-qt-primary outline-none transition-colors
+              autoComplete="postal-code"
+              enterKeyHint="done"
+              className={`w-full h-12 rounded-md border bg-white px-4 text-[16px] leading-normal text-qt-primary outline-none transition-colors md:text-sm md:leading-normal
                 ${autoFilled && value.postalCode ? 'border-qt-green bg-qt-green-bg/20' : 'border-qt-gray-dark focus:border-qt-green'}`}
               readOnly={autoFilled && !!value.postalCode}
             />

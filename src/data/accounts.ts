@@ -150,6 +150,9 @@ export function getWithdrawalMethodDisableFlags(bank: LinkedBank | null | undefi
   if (country === 'US' && dep === 'USD') {
     return { eft: true, wire: true, international_wire: false };
   }
+  if (country === 'INTL') {
+    return { eft: true, wire: true, international_wire: false };
+  }
   return { eft: false, wire: false, international_wire: true };
 }
 

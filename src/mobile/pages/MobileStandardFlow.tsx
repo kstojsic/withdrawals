@@ -251,7 +251,6 @@ export default function MobileStandardFlow() {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden">
-      {/* ADS: progress block — flex column, padding 0 var(--ads-size-xxs), gap var(--ads-size-xxxs), align-items flex-start, align-self stretch */}
       <div className="relative shrink-0">
         {step > 0 && (
           <button
@@ -264,7 +263,6 @@ export default function MobileStandardFlow() {
           </button>
         )}
         <div className="flex flex-col items-start gap-[length:var(--ads-size-xxxs)] self-stretch px-[length:var(--ads-size-xxs)] pb-2 pt-2">
-          {/* body/additional/medium-semibold */}
           <h1 className="w-full text-center font-[family-name:var(--ads-font-family-body)] text-[length:var(--ads-font-size-s)] font-semibold leading-[length:var(--ads-font-line-height-s)] text-[var(--ads-color-body-contrast-100)]">
             {STEP_TITLES[step]}
           </h1>

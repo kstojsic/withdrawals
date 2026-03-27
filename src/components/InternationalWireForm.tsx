@@ -9,9 +9,17 @@ interface InternationalWireFormProps {
   amount: string;
   onChange: (data: InternationalWireData) => void;
   data: InternationalWireData;
+  /** Link-bank flow: editable holder, wire currency, optional reason; omits withdrawal amount. */
+  linkBank?: boolean;
 }
 
-export default function InternationalWireForm({ currency, amount, onChange, data }: InternationalWireFormProps) {
+export default function InternationalWireForm({
+  currency,
+  amount,
+  onChange,
+  data,
+  linkBank = false,
+}: InternationalWireFormProps) {
   function update(field: keyof InternationalWireData, value: string | boolean) {
     onChange({ ...data, [field]: value });
   }
@@ -23,28 +31,77 @@ export default function InternationalWireForm({ currency, amount, onChange, data
     if (!coreComplete) setShowFullForm(false);
   }, [coreComplete]);
 
-  const compact = coreComplete && !showFullForm;
+  const compact = !linkBank && coreComplete && !showFullForm;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="bg-qt-bg-3 rounded-lg p-4">
-        <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary mb-2">Pre-filled information</p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-qt-secondary">Account holder</p>
-            <p className="text-sm font-semibold text-qt-primary">{data.firstName} {data.lastName}</p>
+        <p className="text-xs font-bold tracking-wider uppercase text-qt-secondary mb-2">
+          {linkBank ? 'Account information' : 'Pre-filled information'}
+        </p>
+        {linkBank ? (
+          <div className="flex flex-col gap-4">
+            <InputField
+              label="First name"
+              placeholder="First name"
+              value={data.firstName}
+              onChange={(e) => update('firstName', e.target.value)}
+            />
+            <InputField
+              label="Last name"
+              placeholder="Last name"
+              value={data.lastName}
+              onChange={(e) => update('lastName', e.target.value)}
+            />
+            <p className="text-xs text-qt-secondary">Withdrawal amount will be set when you request a transfer.</p>
+            <div>
+              <p className="text-sm text-qt-secondary mb-2">Wire currency</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(['CAD', 'USD'] as const).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => update('currency', c)}
+                    className={`min-h-11 rounded-md border px-3 text-sm font-semibold transition-colors ${
+                      data.currency === c
+                        ? 'border-qt-green bg-qt-green-bg/30 text-qt-primary'
+                        : 'border-qt-border bg-white text-qt-secondary'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-semibold text-qt-primary mb-1 block">Reason for wire (optional)</label>
+              <textarea
+                value={data.reason}
+                onChange={(e) => update('reason', e.target.value)}
+                placeholder="e.g. savings transfer"
+                rows={3}
+                className="w-full rounded-md border border-qt-gray-dark bg-white px-4 py-3 text-sm text-qt-primary outline-none focus:border-qt-green"
+              />
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-qt-secondary">Withdrawal amount</p>
-            <p className="text-sm font-semibold text-qt-primary">
-              {currency === 'CAD' ? 'CA' : 'US'}${amount ? parseFloat(amount).toLocaleString('en-CA', { minimumFractionDigits: 2 }) : '0.00'}
-            </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-qt-secondary">Account holder</p>
+              <p className="text-sm font-semibold text-qt-primary">{data.firstName} {data.lastName}</p>
+            </div>
+            <div>
+              <p className="text-xs text-qt-secondary">Withdrawal amount</p>
+              <p className="text-sm font-semibold text-qt-primary">
+                {currency === 'CAD' ? 'CA' : 'US'}${amount ? parseFloat(amount).toLocaleString('en-CA', { minimumFractionDigits: 2 }) : '0.00'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-qt-secondary">Currency</p>
+              <p className="text-sm font-semibold text-qt-primary">{currency}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-qt-secondary">Currency</p>
-            <p className="text-sm font-semibold text-qt-primary">{currency}</p>
-          </div>
-        </div>
+        )}
       </div>
 
       {compact ? (

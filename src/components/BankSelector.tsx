@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, Building2, Check } from 'lucide-react';
 import type { LinkedBank } from '../types';
+import { getLinkedBankDepositCurrency } from '../data/accounts';
 import LinkBankModal from './LinkBankModal';
 
 interface BankSelectorProps {
@@ -21,7 +22,7 @@ export default function BankSelector({ value, onChange, allBanks, onBanksChange 
 
   return (
     <div>
-      <p className="font-semibold text-sm text-qt-primary mb-3">Select bank account for deposit</p>
+      <p className="font-semibold text-sm text-qt-primary mb-3">Bank for deposit</p>
       <div className="flex flex-col gap-2">
         {allBanks.map((bank) => (
           <button
@@ -39,7 +40,9 @@ export default function BankSelector({ value, onChange, allBanks, onBanksChange 
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm text-qt-primary">{bank.name}</p>
-              <p className="text-xs text-qt-secondary">Account ending in {bank.last4}</p>
+              <p className="text-xs text-qt-secondary">
+                Account ending in {bank.last4} · {getLinkedBankDepositCurrency(bank)}
+              </p>
             </div>
             {value === bank.id && (
               <Check size={20} className="text-qt-green shrink-0" />

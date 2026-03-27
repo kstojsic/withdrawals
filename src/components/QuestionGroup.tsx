@@ -10,7 +10,7 @@ interface QuestionGroupProps {
 
 export default function QuestionGroup({ title, subtitle, step, totalSteps, children }: QuestionGroupProps) {
   return (
-    <div className="border border-qt-border rounded-xl overflow-hidden animate-[fadeSlideIn_0.3s_ease-out]">
+    <div className="border border-qt-border rounded-xl overflow-hidden animate-[fadeInSoft_0.25s_ease-out]">
       <div className="bg-qt-bg-3 px-5 py-3 border-b border-qt-border flex items-center justify-between">
         <p className="font-semibold text-sm text-qt-primary">{title}</p>
         {step != null && totalSteps != null && (

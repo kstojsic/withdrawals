@@ -6,7 +6,7 @@ interface MobileShellProps {
 
 export default function MobileShell({ children }: MobileShellProps) {
   return (
-    <div className="mx-auto box-border flex h-[100dvh] max-h-[100dvh] min-h-0 w-full max-w-[430px] flex-col bg-qt-bg-2 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))] font-[family-name:var(--ads-font-family-body)]">
+    <div className="mx-auto box-border flex h-svh max-h-svh min-h-0 w-full max-w-[min(100%,var(--mobile-layout-max-width))] flex-col bg-qt-bg-2 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.25rem,env(safe-area-inset-top))] pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] font-[family-name:var(--ads-font-family-body)]">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--ads-color-elevation-overlay)]">
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-behavior-y-contain">
           {children}

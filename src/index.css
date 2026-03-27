@@ -2,6 +2,8 @@
 
 /* ADS design tokens (transfer flow spec — fallbacks match provided literals) */
 :root {
+  /* Primary mobile layout width (iPhone 17 portrait CSS width ≈ 402px; Pro Max / Air differ — use min(100%, …) in UI). */
+  --mobile-layout-max-width: 402px;
   --ads-size-quark: 2px;
   --ads-size-nano: 4px;
   --ads-size-xxs: 16px;
@@ -72,9 +74,10 @@ body {
 
 /* Mobile entry only (see mobile.html #root.mobile-root) */
 #root.mobile-root {
-  height: 100dvh;
-  max-height: 100dvh;
-  min-height: 100dvh;
+  /* svh stays stable when the virtual keyboard opens; dvh shrinks and makes the whole shell “lift”. */
+  height: 100svh;
+  max-height: 100svh;
+  min-height: 100svh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -93,5 +96,15 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* No transform — avoids mobile scroll jank when new questionnaire sections mount. */
+@keyframes fadeInSoft {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
